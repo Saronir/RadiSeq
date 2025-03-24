@@ -427,7 +427,7 @@ double averageOfEverySecond(const std::vector<double>& vec){
 //the increasing and decreasing segments of the triangle.
 //------------------------------------------------------------------------------------------------------
 double GCBias::slope = 0.0;                                                                             // Initialization of static variables
-//double GCBias::peak = 0.0;
+double GCBias::peak = 0.0;
 int GCBias::bin_size = 0.0;
 
 void GCBias::set_GCbias_binSize(int GC_binSize){                                                        // Function to set the bin size over which GC fraction will be determined
@@ -439,9 +439,9 @@ void GCBias::set_GCbias_slope(double degree_of_GC_bias){                        
 double GCBias::get_GCbias_slope(){                                                                      // Function to get the slope previously set               
     return slope;
 }
-/* void GCBias::set_GCbias_peak(double mean_GC_content){                                                   // Function to set the peak (X1) of the triangular bias function at the mean GC content
+void GCBias::set_GCbias_peak(double mean_GC_content){                                                   // Function to set the peak (X1) of the triangular bias function at the mean GC content
     peak = mean_GC_content;
-} */
+}
 double GCBias::get_GCfraction(const std::string& chrm_seg_seq){
     double GCfraction_bin{0.0};
     std::bitset<256> isN;
@@ -496,10 +496,10 @@ double GCBias::get_GCfraction(const std::string& chrm_seg_seq){
 
 double GCBias::get_GCbias(double GC_content){                                                           // Get the bias value from the traingualar bias function specified by the slope and peak
     double bias{0};                                                                                     // Variable to hold the y value in the line equation
-    if(GC_content<=0.5){                                                                                // For x <= X1
-        bias = (slope*(GC_content-0.5)*100)+1;                                                          // y = m(x-X1) + Y1 ; point-slope equation. (X1,Y1) is the peak value. Multiplying with 100 extends x range from [0,1] to [0,100]; gives slope more sensitivity
+    if(GC_content<=peak){                                                                                // For x <= X1
+        bias = (slope*(GC_content-peak)*100)+1;                                                          // y = m(x-X1) + Y1 ; point-slope equation. (X1,Y1) is the peak value. Multiplying with 100 extends x range from [0,1] to [0,100]; gives slope more sensitivity
     }else{                                                                                              // For x > X1
-        bias = (-slope*(GC_content-0.5)*100)+1;                                                         // y = -m(x-X1) + Y1 ; Y1 = 1, which is the peak bias
+        bias = (-slope*(GC_content-peak)*100)+1;                                                         // y = -m(x-X1) + Y1 ; Y1 = 1, which is the peak bias
     }
     return std::max(bias, 0.0);                                                                         // Ensure bias is non-negative
 }

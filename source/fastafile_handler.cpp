@@ -258,7 +258,7 @@ long buildUndamagedGenomeTemplate_MM(char* templateFileMapping, std::size_t temp
     writeBatchToMMFile(batch_buffer, position_in_MM, templateFileMapping, templateFileSize);              // If there are unwritten data in batch buffer, write that too when the loop ends                 
     
     *average_GC_content = averageOfEverySecond(chrm_GC_fraction);                                         // Calculate the average GC content as the average fraction of G,C in the entire genome
-    //GCBias::set_GCbias_peak(*average_GC_content);                                                         // Set where the GC bias to peak with its triangular function
+    GCBias::set_GCbias_peak(*average_GC_content);                                                         // Set where the GC bias to peak with its triangular function
     ref_chrm_weights.resize(chrm_length_weight.size());                                                   // Reshape the ref_chrm_weights vector to the required size in advance
     std::fill(ref_chrm_weights.begin(), ref_chrm_weights.end(), 0.0);                                     // Fill all the positions of the vector with zeros
     double total_chrm_weight{0.0};                                                                        // A temporary variable to hold the total weight from each chrm weight for normalization 
