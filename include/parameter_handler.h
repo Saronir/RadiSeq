@@ -59,6 +59,10 @@ class NGSParameters{
     double r2_delError_rate;                                                     // Deletion error rate in read 2 
     std::string fastq_filename_prefix;                                           // String to hold the user-specified fastq output filename prefix
     bool is_summary_report{false};                                               // True if user wishes to generate a summary report at the end of the run
+    double structural_variation_frequency;                                       // Frequency of mutations for inserting mutations directly into a genome
+    double proportion_long_deletion;
+    int min_long_deletion_length;
+    int max_long_deletion_length;
 
 public:
     NGSParameters();                                                             // Default constructor
@@ -195,6 +199,18 @@ public:
 
     void help_parameter(std::string*);                                           // Function to print help message for every parameter
     void success_parameter();                                                    // Function to check the appropriateness of all parameters
+
+    void set_structural_variation_frequency(std::string*, std::string*);
+    double get_structural_variation_frequency();
+
+    void set_proportion_long_deletions(std::string*);
+    double get_proportion_long_deletion();
+
+    void set_min_long_deletion_length(std::string*);
+    int get_min_long_deletion_length();
+
+    void set_max_long_deletion_length(std::string*);
+    int get_max_long_deletion_length();
 
 };
 

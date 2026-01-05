@@ -179,6 +179,18 @@ void NGSParameters::set_parameters(std::string* paramName, std::string* paramVal
     else if (*paramName == "make_summary_report"){
         set_summary_report(paramName, paramValue);
     }
+    else if (*paramName == "structural_variation_frequency"){
+        set_structural_variation_frequency(paramName, paramValue);
+    }
+    else if (*paramName == "proportion_long_deletions"){
+        set_proportion_long_deletions(paramValue);
+    }
+    else if (*paramName == "min_long_deletion_length"){
+        set_min_long_deletion_length(paramValue);
+    }
+    else if (*paramName == "max_long_deletion_length"){
+        set_max_long_deletion_length(paramValue);
+    }
     else{
         std::cerr<<"\n WARNING: Unrecognized parameter specified : \""<<*paramName<<"\"\n"
         <<" ----- This parameter will be ignored -----\n";
@@ -423,6 +435,23 @@ void NGSParameters::set_summary_report(std::string* paramName, std::string* para
         std::cerr<<" ----- Setting \""<<*paramName<<"\" to its default value: \"True\" -----\n";
     }
 }
+void NGSParameters::set_structural_variation_frequency(std::string* paramName, std::string* paramValue){
+    if(std::stod(*paramValue) >= 0.0){
+        structural_variation_frequency = std::stod(*paramValue);
+    }else{
+        help_parameter(paramName);
+        std::cerr<<" ----- Setting \""<<*paramName<<"\" to its default value: \"0.0\" -----\n";
+    }
+}
+void NGSParameters::set_proportion_long_deletions(std::string* paramValue){
+    proportion_long_deletion = std::stod(*paramValue);
+}
+void NGSParameters::set_min_long_deletion_length(std::string* paramValue){
+    min_long_deletion_length = std::stoi(*paramValue);
+}
+void NGSParameters::set_max_long_deletion_length(std::string* paramValue){
+    max_long_deletion_length = std::stoi(*paramValue);
+}
 //--------------------------------------------------------------------------------------------
 
 
@@ -559,6 +588,18 @@ const std::string* NGSParameters::get_output_fastq_filename_prefix(){
 bool NGSParameters::get_summary_report(){
     return(is_summary_report);
 }
+double NGSParameters::get_structural_variation_frequency(){
+    return(structural_variation_frequency);
+}
+double NGSParameters::get_proportion_long_deletion(){
+    return(proportion_long_deletion);
+}
+int NGSParameters::get_min_long_deletion_length(){
+    return(min_long_deletion_length);
+}
+int NGSParameters::get_max_long_deletion_length(){
+    return(max_long_deletion_length);
+}
 //--------------------------------------------------------------------------------------------
 
 
@@ -685,6 +726,10 @@ void NGSParameters::help_parameter(std::string* paramName){
     else if (*paramName == "make_summary_report"){
         std::cerr<<" This parameter should be set \"True\" or \"False\" "
         <<"to specify whether or not you wish to generate a summary report at the end of the run \n";
+    }
+    else if (*paramName == "structural_variation_frequency"){
+         std::cerr<<" This parameter should be set to a positive double "
+        <<"or set to 0.0 to disable the feature entirely in the simulation. \n";
     }
 }
 //--------------------------------------------------------------------------------------------

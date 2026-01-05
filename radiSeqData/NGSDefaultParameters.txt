@@ -94,3 +94,37 @@ read2_deletion_error_rate                   = 0.00023                 # Specify 
 output_FASTQ_filename_prefix                = CELL                    # Prefix for the sequenced output FASTQ file (omit file extension)
 
 make_summary_report                         = True                    # "True" if user wishes to generate a summary report file at the end of run
+
+#begin Lexa's additions for inserting mutations into cells directly
+
+structural_variation_frequency              = 0.00                    # Positive double representing the frequencing of structural variations. Set to 0 to disable the feature by default.
+
+#proportion_balanced_inversions              = 0.50                    # Fraction of mutations that are balanced inversions. Expects a double between 0 and 1.
+
+#min_balanced_inversion_length		    = 50		      # Minimum number of base pairs a balanced inversion can be.
+
+#max_balanced_inversion_length               = 10000		      # Maximum number of base pairs a balanced inversion can be.
+
+#proportion_balanced_translocations          = 0.20                    # Fraction of mutations that are balanced translocations. Expects a double between 0 and 1.
+
+#min_balanced_translocation_length_a         = 5000                  # Minimum length from end of chromosome 'a' that a balanced translocation can be.
+
+#min_balanced_translocation_length_b         = 5000                  # Minimum length from end of chromosome 'b' that a balanced translocation can be.
+
+#max_balanced_translocation_length_a         = 1000000                  # Minimum length from end of chromosome 'a' that a balanced translocation can be.
+
+#max_balanced_translocation_length_b         = 1000000                  # Minimum length from end of chromosome 'b' that a balanced translocation can be.
+
+#translocation_pairing_distribution_path     = ""                       # Default path for translocation pairing function.  
+
+proportion_long_deletions                   = 0.20                    # Fraction of mutations that are long deletions. Expects a double between 0 and 1.
+
+min_long_deletion_length                    = 50                      # Minimum length of a long deletion. Integer number of base pairs.
+
+max_long_deletion_length                    = 10000                   # Maximum length of a long deletion. Integer number of base pairs.
+
+#proportion_indels                           = 0.10                    # Fraction of mutations that are insertion-deletions. Expects a double between 0 and 1.
+
+#min_indel_length                            = 1                       # Minimum length of an indel. Integer number of base pairs.
+
+#max_indel_length                            = 49                      # Maximum length of an indel. Integer number of base pairs.

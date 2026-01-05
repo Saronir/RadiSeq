@@ -1,0 +1,68 @@
+------------------------------------------------------------------------------------------------------------
+                                   RADISEQ SIMULATOR RUN SUMMARY REPORT             
+------------------------------------------------------------------------------------------------------------
+ This report was prepared on Fri Nov 28 10:57:13 2025
+
+
+ Time duration of this run                                            : 0 min
+ The random seed used for this run                                    : 1234
+ Multi-threading option                                               : Disabled
+ The parameter file specified                                         : ./TestParameters.txt
+
+ ------ SDD file information -------
+ Number of cells irradiated in the Monte Carlo Simulation             : 2
+ Number of SDD files given to merge damages from                      : 2
+ The names of these SDD files are                                     : ./test_sdd.txt, ./test_sdd2.txt
+ These SDD files are generated with the primary particles             : electron, Unspecified
+ The dose contributions of these particles                            : 1 Gy, 1 Gy (Total of 2 Gy)
+ Are the radiation-induced damages adjusted for actual delivered dose : Yes 
+ Number of damages are adjusted for delivered dose using the files    : ./test_actualDose.txt, ./test_actualDose2.txt
+ The genome length of the Monte Carlo cell model                      : 2808 bp
+ Name of the reference genome file used                               : ./test_fasta.fa
+ The length of the reference genome                                   : 3042 bp
+ Average GC content of the reference genome                           : 4.23157%
+
+ ------ Sequencing information -------
+ Name of the Illumina sequencer used for NGS simulation               : test
+ The sequencing protocol used                                         : Single-cell Whole Genome Sequencing
+ The read generation modality used                                    : Paired-end read generation
+ Fraction of read pairs in other orientations (not inward-oriented)   : 0
+ The minimum and maximum lengths of the DNA fragments created         : 5, 20
+ Function describing the DNA fragment size distribution               : Beta distribution with shape parameters 4.5 (beta) and 2.75 (alpha)
+ Total number of cells in the sample                                  : 10
+ Number of cells randomly sampled from the sample pool for sequencing : 5
+ Length of the reads simulated                                        : 5 bp
+ Is the simulation GC biased                                          : No 
+ Total number reads generated in the NGS simulation (expected)        : 6084
+ Average number of reads generated per cell (expected)                : 1216
+ Total read coverage obtained                                         : 10
+ The mean read coverage per cell                                      : 2
+ The wholge-genome amplification coverage profile used                : Uniform amplification
+ The rate of read artifacts formation                                 : 0
+ The error-rate used for adding insertions in read 1                  : 9e-05
+ The error-rate used for adding insertions in read 2                  : 0.00015
+ The error-rate used for deletions in read 1                          : 0.00011
+ The error-rate used for deletions in read 2                          : 0.00023
+ The directory where the sequenced FASTQ files are stored             : ./output
+
+ ------ Output data information -------
+
+------------------------------------------------------------------------------------------------------------
+|    Name of the cell sequenced                   |    Output FASTQ filename                               |
+------------------------------------------------------------------------------------------------------------
+|    Undamaged_cell                               |    CELL_0_R1.fastq.gz                                  |
+|                                                 |    CELL_0_R2.fastq.gz                                  |
+|                                                                                                          |
+|    Undamaged_cell                               |    CELL_1_R1.fastq.gz                                  |
+|                                                 |    CELL_1_R2.fastq.gz                                  |
+|                                                                                                          |
+|    Undamaged_cell                               |    CELL_2_R1.fastq.gz                                  |
+|                                                 |    CELL_2_R2.fastq.gz                                  |
+|                                                                                                          |
+|    Undamaged_cell                               |    CELL_3_R1.fastq.gz                                  |
+|                                                 |    CELL_3_R2.fastq.gz                                  |
+|                                                                                                          |
+|    Damaged_cell_1                               |    CELL_4_R1.fastq.gz                                  |
+|                                                 |    CELL_4_R2.fastq.gz                                  |
+|                                                                                                          |
+------------------------------------------------------------------------------------------------------------

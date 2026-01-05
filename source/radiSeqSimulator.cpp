@@ -94,6 +94,15 @@ int main(int argc, char* argv[]){
     }
     std::cout<<"\n Successfully completed the SDD file processing "<<std::endl;
 
+    /*  Before damage is  placed on any cells we might want to insert mutations semi-randomly into the population.
+
+    */
+    if(parameters.get_structural_variation_frequency()>0.0){
+        std::cout<<"\n ---- Adding mutations to cells according to parameters ----"<<std::endl;
+        
+    }
+
+
     // Read each cell (exposure) damage data from the SDD file, adjust the damages according to the actual dose delivered if necessary,
     // then combine multiple radiation damages on the same cell if needed, find DSB locations and then build a damaged genome FASTA file for each cell   
     // But do all that, ONLY if the number of damaged data (exposure) is more than 0
