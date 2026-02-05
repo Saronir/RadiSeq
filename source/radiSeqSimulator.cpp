@@ -24,6 +24,14 @@ int main(int argc, char* argv[]){
     
     auto start_time = std::chrono::high_resolution_clock::now();                                                // Get the starting time of the run (for run time calculation)                                                                                       // Getting the starting time of the program
     
+    /*for(int i = 0; i<100; i++){
+        int sample = rng::poisson_sample(0.5);
+        std::cout << sample << std::endl;
+    }
+
+    std::string hold;
+    std::getline(std::cin, hold);*/
+    
     const char* dataFolder = std::getenv("RADISEQ_DATA_DIR");                                                   // Getting the environment variable "RADISEQ_DATA" which holds the position of the radiSeqData folder path
     std::string dataFolderPath;                                                                                 // Variable to hold the string value of the environment variable
     if (dataFolder != nullptr){                                                                                 // Check if the environment variable is set. If not, exit with error message
@@ -97,17 +105,23 @@ int main(int argc, char* argv[]){
     /*  Before damage is  placed on any cells we might want to insert mutations semi-randomly into the population.
 
     */
+    std::vector<std::string>& sdd_paths = parameters.get_sddfile_path();                          
+    //std::vector<std::vector<double>> line_weights_in_cell_files{static_cast<size_t>(SDDdata.get_num_of_exposures())};// Vector to store the vector that contains the weights of each line in the cell's fasta file. Weighted according to the segment length
+    std::vector<std::vector<double>> line_weights_in_cell_files{static_cast<size_t>(parameters.get_number_of_cells_to_mutate())};
     if(parameters.get_structural_variation_frequency()>0.0){
         std::cout<<"\n ---- Adding mutations to cells according to parameters ----"<<std::endl;
-        
+        for(int i=0; i<parameters.get_number_of_cells_to_mutate(); i++){
+            std::cout<<"\nCell: "<< i+1 <<std::endl;
+            std::string fastaFileNameX = "/Damaged_cell_" + std::to_string(i+1) + ".fa";
+            line_weights_in_cell_files[i] = buildMutatedCellGenome_from_MM(tempFolderPath, fastaFileNameX, genomeTemplate_data, templateSize, ref_seq_length, parameters);
+        }
     }
-
 
     // Read each cell (exposure) damage data from the SDD file, adjust the damages according to the actual dose delivered if necessary,
     // then combine multiple radiation damages on the same cell if needed, find DSB locations and then build a damaged genome FASTA file for each cell   
     // But do all that, ONLY if the number of damaged data (exposure) is more than 0
-    std::vector<std::string>& sdd_paths = parameters.get_sddfile_path();                          
-    std::vector<std::vector<double>> line_weights_in_cell_files{static_cast<size_t>(SDDdata.get_num_of_exposures())};// Vector to store the vector that contains the weights of each line in the cell's fasta file. Weighted according to the segment length
+    //std::vector<std::string>& sdd_paths = parameters.get_sddfile_path();                          
+    //std::vector<std::vector<double>> line_weights_in_cell_files{static_cast<size_t>(SDDdata.get_num_of_exposures())};// Vector to store the vector that contains the weights of each line in the cell's fasta file. Weighted according to the segment length
 
     int nThreads_User = parameters.get_number_of_threads();                                                         // Variable holding the number of threads the user requesting for parallel processing
     omp_set_nested(1);                                                                                              // Enable nested parallelism 
@@ -157,6 +171,7 @@ int main(int argc, char* argv[]){
                 //SDDdata.find_DNA_breakPoints(parameters.get_dsb_threshold());
                 //-------------- Stage 3: Generating damaged cell genomes -----------------//
                 std::string fastaFileName = "/Damaged_cell_" + std::to_string(i+1) + ".fa";
+                //line_weights_in_cell_files[i] = buildMutatedCellGenome_from_MM(SDDdata, tempFolderPath, fastaFileName, genomeTemplate_data, templateSize, ref_seq_length, parameters);
                 line_weights_in_cell_files[i] = buildDamagedCellGenome_from_MM(SDDdata, tempFolderPath, fastaFileName, genomeTemplate_data, templateSize, ref_seq_length, groupTID);
                 #pragma omp critical
                 {
@@ -187,7 +202,18 @@ int main(int argc, char* argv[]){
                 cellGenomes_to_be_sequenced.push_back(damaged_fasta_filename);                                  // Else, add the corresponding damaged cell name to the list
                 line_weights_in_cell_to_seq.push_back(line_weights_in_cell_files[cell_id-1]);                   // Add the line weight vector of each damaged cell to the list
             }
-        }else{                                                                                                  // If the picked cell ID is beyond the number of damaged cells, add undamaged genome fasta to the list
+        }
+        //for mutation mode we just read a different parameter
+        else if (cell_id <= parameters.get_number_of_cells_to_mutate()){                                        // If the ID corresponds to a damaged cell, then
+            std::string damaged_fasta_filename = "Damaged_cell_" + std::to_string(cell_id) + ".fa";
+            if (std::find(cellGenomes_to_be_sequenced.begin(), cellGenomes_to_be_sequenced.end(), damaged_fasta_filename) != cellGenomes_to_be_sequenced.end()){
+                continue;                                                                                       // Check if the filename is already in the vector. If yes, continue and pick another cell ID
+            }else{
+                cellGenomes_to_be_sequenced.push_back(damaged_fasta_filename);                                  // Else, add the corresponding damaged cell name to the list
+                line_weights_in_cell_to_seq.push_back(line_weights_in_cell_files[cell_id-1]);                   // Add the line weight vector of each damaged cell to the list
+            }
+        }
+        else{                                                                                                  // If the picked cell ID is beyond the number of damaged cells, add undamaged genome fasta to the list
             cellGenomes_to_be_sequenced.push_back("Undamaged_cell.fa");
             line_weights_in_cell_to_seq.push_back(ref_chrm_weights);
         }

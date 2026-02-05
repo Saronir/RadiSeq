@@ -1,10 +1,15 @@
 #include "fastafile_handler.h"
 #include "fileio.h"
 #include "support_functions.h"
+#include "random_generator.h"
 
 #include <fstream>
+#include <iostream>
+#include <string>
 #include <sys/mman.h>
 #include <omp.h>
+
+
 
 
 //--------------------------------------------------------------------------------------------
@@ -791,37 +796,90 @@ std::vector<double> buildDamagedCellGenome_from_MM(NGSsdd& SDDdata, const std::s
 
 
 */
-std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath, const std::string& fileName, char* genomeTemplate_data, size_t templateSize, long ref_seq_length, NGSParameters& parameter){
+std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath, const std::string& fileName, char* genomeTemplate_data, size_t templateSize, long ref_seq_length, NGSParameters& parameters){
     size_t outFileSize = templateSize+10000;                                                                    // Temporary variable to hold the size of the current file being processed. This get dynamically changed if needed. Starts with undamagedfile size +10kb extra
     std::string outFilePath = outputPath+fileName;                                                              // Path to the output fasta file that we want to write
     char* outFileMapping = createMemoryMappedFile(outFilePath,outFileSize);                                     // Create a memory mapped output file for each damaged cell genome
     char* position_in_MM = outFileMapping;                                                                      // Pointer to the current position in the MM as we write. Starts with the pointer to the beginning
-    std::vector<double> chrm_seg_weights;                                                                       // This is a vector to hold the weights of each chromosome segment scaled to its length
+    std::vector<double> chrm_seg_weights;                                                                      // This is a vector to hold the weights of each chromosome segment scaled to its length
     if (position_in_MM == nullptr){return chrm_seg_weights;}                                                    // Return if the template file memory map is not valid
     std::vector<double> chrm_GC_bias;                                                                           // Temporary vector to hold the GC bias associated with each chromosome segment
-
     long total_seq_length = ref_seq_length*2;                                                                   // Twice the length because it has two strands contributing
     std::string chromID_A;                                                                                      // Strings to hold the chrom IDs and Sequences from the file
     std::string chromSeq_A;
     std::string chromID_B;
     std::string chromSeq_B;
     long seqStartIndex = 0;                                                                                     // Variable that will hold the starting index for each chromsome sequence in the genome
-    //std::vector<long>& baseDamageLoc1 = SDDdata.get_basestrand1_damage_loc(groupTID);                           // Referencing the damage location vector to a temp vector for ease of handling
-    //std::vector<long>& baseDamageLoc2 = SDDdata.get_basestrand2_damage_loc(groupTID);
-    //std::vector<long>& strandbreakLoc1 = SDDdata.get_backbone1_break_loc(groupTID);
-    //std::vector<long>& strandbreakLoc2 = SDDdata.get_backbone2_break_loc(groupTID);
-    size_t i{0}; size_t j{0}; size_t k{0}; size_t l{0};                                                         // Counter variables to keep a tab on the elements in the damage location vector that we already processed
     const int batchSize = 100;                                                                                  // Define a batch size for writing data to the output file. These much data will be stored in cache before writing it on the file
     std::vector<std::string> batch_buffer;                                                                      // Create a buffer for storing output data.
     size_t position = 0;                                                                                        // Temporary variable to hold the last read position in the memory map
     double GCslope = GCBias::get_GCbias_slope();                                                                // Temporary variable to hold the GC biase slope to avoid calling the function again and again
-    
-
-    while (readFastaMemoryMap(genomeTemplate_data, templateSize, position, chromID_A, chromSeq_A, chromID_B, chromSeq_B)){// Get forward, backward sequences and their repective IDs for each chroms, one at a time
-        long seq_length = chromSeq_A.size();                                                                    // Sequence length is same for both A and B 
+    int num_chrom = parameters.get_number_chromo();
+    double mean_num_long_del = parameters.get_proportion_long_deletion() * parameters.get_structural_variation_frequency(); //mean number of long deletions
+    int num_long_del = rng::poisson_sample(mean_num_long_del); //number of long deletions in the cell
+    std::vector<std::tuple<int, int>> long_dels; //vector that holds the chromosome number and length of each long deletion
+    int length_LD_min = parameters.get_min_long_deletion_length(); //fetch min length of long deletion
+    int length_LD_max = parameters.get_max_long_deletion_length(); //fetch max length of long deletion
+    for (int i = 0; i < num_long_del; i++){ //create long deletion data for the cell to add to the chromosomes
+        int del_length = rng::int_sample(length_LD_min, length_LD_max); //pick a random length for each long deletion
+        if(num_chrom > 1){
+            int del_chrom = rng::int_sample(1, num_chrom); //pick a random chromosome for each long deletion
+            long_dels.push_back(std::make_tuple(del_chrom, del_length));
+        }
+        else if(num_chrom == 1){
+            long_dels.push_back(std::make_tuple(1, del_length));
+        }
         
+    }
+    size_t toc = 1;
+    int j = 0;
+    int k = 0;
+    while (readFastaMemoryMap(genomeTemplate_data, templateSize, position, chromID_A, chromSeq_A, chromID_B, chromSeq_B)){// Get forward, backward sequences and their repective IDs for each chroms, one at a time
+        long seq_length = chromSeq_A.size();                                                                              // Sequence length is same for both A and B 
+        for(int i = 0; i < long_dels.size(); i++){                                                                        // check if current chromosome being processed gets a mutation from the mutation grid
+            if(toc == std::get<0>(long_dels[i])){                                                                                   // if chromosome number is chromosome that gets a mutation add the mutation
+                int proc = rng::int_sample(1, seq_length);                                                                // pick mutation loacation on sequence
+                std::cout<<"\n ----- Mutation ----- "<< "Chromosome: " << toc << " Position: " << proc << std::endl;
+                int length = std::get<1>(long_dels[i]);
+                int start = proc - seqStartIndex - 1;
+                for (int k = 0; k <= length; k++) {
+                    int idx = start + k;
+                    if (idx < 0 || idx >= seq_length) {
+                        break;
+                    }
+                    chromSeq_A[idx] = 'N';
+                }
+                for (int k = 0; k <= length; ++k) {
+                    int idx = start + k + 1;
+                    if (idx < 0 || idx >= seq_length) {
+                        break;
+                    }
+                    chromSeq_B[seq_length - idx] = 'N';
+                }
+            }
+        }  
+        batch_buffer.push_back(chromID_A+"\n"+chromSeq_A+"\n");
+        chrm_seg_weights.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+        chrm_seg_weights.push_back(static_cast<double>(chromSeq_A.size())/total_seq_length);            
+        if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+            double chrm_GC_fraction = GCBias::get_GCfraction(chromSeq_A);                                   // Get the GC fraction in the chromosome segment 
+            chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+            chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+        }  
+        batch_buffer.push_back(chromID_B+"\n"+chromSeq_B+"\n");
+        chrm_seg_weights.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+        chrm_seg_weights.push_back(static_cast<double>(chromSeq_B.size())/total_seq_length);            
+        if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+            double chrm_GC_fraction = GCBias::get_GCfraction(chromSeq_B);                                   // Get the GC fraction in the chromosome segment 
+            chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+            chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+        }
 
+        if (batch_buffer.size() >= batchSize){                                                                  // Check if the batch buffer is full, and write it to the file if needed.
+            writeBatchToMMFile(batch_buffer, position_in_MM, outFileMapping, outFileSize, outFilePath);
+        }
 
+        toc++;
         seqStartIndex += seq_length;
     }
     writeBatchToMMFile(batch_buffer, position_in_MM, outFileMapping, outFileSize, outFilePath);                 // If there are unwritten data in batch buffer, write that too when the loop ends
@@ -829,7 +887,6 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
         perror("\nERROR: Failed to synchronize memory-mapped data to file.\n");
     }
     munmap(outFileMapping, outFileSize);                                                                        // Unmap the memory-map to avoid memory leaks after use
-    
     if(!chrm_GC_bias.empty()){                                                                                  // Modify chromosome segment weights if there is GC bias also to be considered
         double total_chrm_weight{0};                                                                            // A temporary variable to hold the total weight from each chrm weight for normalization 
         for (size_t i = 0; i<chrm_seg_weights.size(); ++i){
@@ -841,6 +898,5 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
             chrm_seg_weights[i] /= total_chrm_weight;                                                           // Divide each chromosome length with the total weight to normalize the vector
         }
     }
-    
     return (chrm_seg_weights);
 }

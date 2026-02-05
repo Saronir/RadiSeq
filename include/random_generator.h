@@ -107,6 +107,16 @@ namespace rng{
         }
         return(0);                                                                               // Properly weighted data should not execute this return
     }
+    inline int poisson_sample(double mean){ //thread safe poisson sampler for mutagen -LL
+        static thread_local std::mt19937 generator{std::random_device{}()};
+        std::poisson_distribution<int> dist(mean);
+        return dist(generator);
+    }
+    inline int int_sample(int lowerBound, int upperBound){ //thread safe integer sampler for mutagen -LL
+        static thread_local std::mt19937 generator{std::random_device{}()};
+        std::uniform_int_distribution<int> dist(lowerBound, upperBound);
+        return dist(generator);
+    }
 
 }
 

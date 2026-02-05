@@ -191,6 +191,12 @@ void NGSParameters::set_parameters(std::string* paramName, std::string* paramVal
     else if (*paramName == "max_long_deletion_length"){
         set_max_long_deletion_length(paramValue);
     }
+    else if (*paramName == "number_of_cells_to_mutate"){
+        set_number_of_cells_to_mutate(paramValue);
+    }
+    else if (*paramName == "number_chromo"){
+        set_number_chromo(paramValue);
+    }
     else{
         std::cerr<<"\n WARNING: Unrecognized parameter specified : \""<<*paramName<<"\"\n"
         <<" ----- This parameter will be ignored -----\n";
@@ -452,6 +458,12 @@ void NGSParameters::set_min_long_deletion_length(std::string* paramValue){
 void NGSParameters::set_max_long_deletion_length(std::string* paramValue){
     max_long_deletion_length = std::stoi(*paramValue);
 }
+void NGSParameters::set_number_of_cells_to_mutate(std::string* paramValue){
+    number_of_cells_to_mutate = std::stoi(*paramValue);
+}
+void NGSParameters::set_number_chromo(std::string* paramValue){
+    number_chromo = std::stoi(*paramValue);
+}
 //--------------------------------------------------------------------------------------------
 
 
@@ -599,6 +611,12 @@ int NGSParameters::get_min_long_deletion_length(){
 }
 int NGSParameters::get_max_long_deletion_length(){
     return(max_long_deletion_length);
+}
+int NGSParameters::get_number_of_cells_to_mutate(){
+    return(number_of_cells_to_mutate);
+}
+int NGSParameters::get_number_chromo(){
+    return(number_chromo);
 }
 //--------------------------------------------------------------------------------------------
 

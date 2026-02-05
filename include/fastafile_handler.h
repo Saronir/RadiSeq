@@ -10,6 +10,6 @@ long buildUndamagedGenomeTemplate_MM(char*, std::size_t, int, int, const std::st
 double getReverseComplementarySeq(const std::string&, std::string&, int GC_binSize=0);                               // GC_binSize is optional
 //int buildDamagedCellGenome(NGSsdd&, const std::string&, const std::string&);
 std::vector<double> buildDamagedCellGenome_from_MM(NGSsdd&, const std::string&, const std::string&, char*, size_t, long, int);
-
+std::vector<double> buildMutatedCellGenome_from_MM(const std::string&, const std::string&, char*, size_t, long, NGSParameters&);
 
 #endif

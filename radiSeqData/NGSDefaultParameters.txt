@@ -97,11 +97,15 @@ make_summary_report                         = True                    # "True" i
 
 #begin Lexa's additions for inserting mutations into cells directly
 
-structural_variation_frequency              = 0.00                    # Positive double representing the frequencing of structural variations. Set to 0 to disable the feature by default.
+structural_variation_frequency              = 10.00                    # Positive double representing the frequencing of structural variations. Set to 0 to disable the feature by default.
+
+number_of_cells_to_mutate                   = 10                      # Specify number of cells in sample to mutate.
+
+number_chromo				     = 1			# Default number of chromosomes per cell.
 
 #proportion_balanced_inversions              = 0.50                    # Fraction of mutations that are balanced inversions. Expects a double between 0 and 1.
 
-#min_balanced_inversion_length		    = 50		      # Minimum number of base pairs a balanced inversion can be.
+#min_balanced_inversion_length		     = 50		      # Minimum number of base pairs a balanced inversion can be.
 
 #max_balanced_inversion_length               = 10000		      # Maximum number of base pairs a balanced inversion can be.
 

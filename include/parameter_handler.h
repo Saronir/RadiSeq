@@ -63,6 +63,8 @@ class NGSParameters{
     double proportion_long_deletion;
     int min_long_deletion_length;
     int max_long_deletion_length;
+    int number_of_cells_to_mutate;
+    int number_chromo;
 
 public:
     NGSParameters();                                                             // Default constructor
@@ -211,6 +213,12 @@ public:
 
     void set_max_long_deletion_length(std::string*);
     int get_max_long_deletion_length();
+
+    void set_number_of_cells_to_mutate(std::string*);
+    int get_number_of_cells_to_mutate();
+
+    void set_number_chromo(std::string*);
+    int get_number_chromo();
 
 };
 
