@@ -123,7 +123,7 @@ number_chromo				     = 1			# Default number of chromosomes per cell.
 
 proportion_long_deletions                   = 0.20                    # Fraction of mutations that are long deletions. Expects a double between 0 and 1.
 
-min_long_deletion_length                    = 50                      # Minimum length of a long deletion. Integer number of base pairs.
+min_long_deletion_length                    = 1000                      # Minimum length of a long deletion. Integer number of base pairs. 50 or 1000?
 
 max_long_deletion_length                    = 10000                   # Maximum length of a long deletion. Integer number of base pairs.
 

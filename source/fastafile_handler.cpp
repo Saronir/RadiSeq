@@ -770,25 +770,7 @@ std::vector<double> buildDamagedCellGenome_from_MM(NGSsdd& SDDdata, const std::s
 }
 //--------------------------------------------------------------------------------------------
 /*
-    This function builds a mutated cell genome.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    This method builds a mutated cell genome.
 
 
 
@@ -796,8 +778,9 @@ std::vector<double> buildDamagedCellGenome_from_MM(NGSsdd& SDDdata, const std::s
 
 
 */
-std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath, const std::string& fileName, char* genomeTemplate_data, size_t templateSize, long ref_seq_length, NGSParameters& parameters){
+std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath, const std::string& fileName, const std::string& mutationFile, char* genomeTemplate_data, size_t templateSize, long ref_seq_length, NGSParameters& parameters){
     size_t outFileSize = templateSize+10000;                                                                    // Temporary variable to hold the size of the current file being processed. This get dynamically changed if needed. Starts with undamagedfile size +10kb extra
+    //std::string mutFile = *parameters.get_output_directory()+"/mutations.txt";
     std::string outFilePath = outputPath+fileName;                                                              // Path to the output fasta file that we want to write
     char* outFileMapping = createMemoryMappedFile(outFilePath,outFileSize);                                     // Create a memory mapped output file for each damaged cell genome
     char* position_in_MM = outFileMapping;                                                                      // Pointer to the current position in the MM as we write. Starts with the pointer to the beginning
@@ -831,15 +814,13 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
         }
         
     }
-    size_t toc = 1;
-    int j = 0;
-    int k = 0;
+    int toc = 1;
     while (readFastaMemoryMap(genomeTemplate_data, templateSize, position, chromID_A, chromSeq_A, chromID_B, chromSeq_B)){// Get forward, backward sequences and their repective IDs for each chroms, one at a time
         long seq_length = chromSeq_A.size();                                                                              // Sequence length is same for both A and B 
         for(int i = 0; i < long_dels.size(); i++){                                                                        // check if current chromosome being processed gets a mutation from the mutation grid
             if(toc == std::get<0>(long_dels[i])){                                                                                   // if chromosome number is chromosome that gets a mutation add the mutation
                 int proc = rng::int_sample(1, seq_length);                                                                // pick mutation loacation on sequence
-                std::cout<<"\n ----- Mutation ----- "<< "Chromosome: " << toc << " Position: " << proc << std::endl;
+                //std::cout<<"\n ----- Mutation ----- "<< "Chromosome: " << toc << " Position: " << proc << std::endl;
                 int length = std::get<1>(long_dels[i]);
                 int start = proc - seqStartIndex - 1;
                 for (int k = 0; k <= length; k++) {
@@ -856,6 +837,9 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                     }
                     chromSeq_B[seq_length - idx] = 'N';
                 }
+                const std::string long_deletion_data = fileName + ", chromosome: " + std::to_string(toc) + ", long deletion at position " + std::to_string(proc) + " of length " + std::to_string(length) + "\n";
+                report_mutations(mutationFile, long_deletion_data);
+                
             }
         }  
         batch_buffer.push_back(chromID_A+"\n"+chromSeq_A+"\n");

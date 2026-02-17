@@ -1062,7 +1062,15 @@ void generate_run_summaryReport(NGSParameters& parameter, NGSsdd& SDDdata){
     }
 }
 //------------------------------------------------------------------------------------------------------------------------
+void report_mutations(const std::string& path, const std::string& data){
+    std::ofstream file(path, std::ios::app);
+    file << data;
+}
 
+void clearFile(const std::string& filename)
+{
+    std::ofstream(filename, std::ofstream::trunc);
+}
 
 
 //------------------------------------------------------------------------------------------------------

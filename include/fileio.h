@@ -31,5 +31,7 @@ int readFastaMemoryMap(const char*, size_t, size_t&, std::string&, std::string&,
 void make_quality_distribution(std::ifstream&, std::vector<std::map<unsigned int, unsigned short>>&);   // function to make a read quaity distribution vector based on the quality profile file passed to the function
 void generate_run_summaryReport(NGSParameters&, NGSsdd& );
 long fileSize_bytes(const std::string&);                                                                // Function to determine the size of a file that is passed. Return in bytes
+void report_mutations(const std::string&, const std::string&);
+void clearFile(const std::string&);
 
 #endif
