@@ -797,32 +797,97 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
     std::vector<std::string> batch_buffer;                                                                      // Create a buffer for storing output data.
     size_t position = 0;                                                                                        // Temporary variable to hold the last read position in the memory map
     double GCslope = GCBias::get_GCbias_slope();                                                                // Temporary variable to hold the GC biase slope to avoid calling the function again and again
+    
     int num_chrom = parameters.get_number_chromo();
-    double mean_num_long_del = parameters.get_proportion_long_deletion() * parameters.get_structural_variation_frequency(); //mean number of long deletions
-    int num_long_del = rng::poisson_sample(mean_num_long_del); //number of long deletions in the cell
-    std::vector<std::tuple<int, int>> long_dels; //vector that holds the chromosome number and length of each long deletion
-    int length_LD_min = parameters.get_min_long_deletion_length(); //fetch min length of long deletion
-    int length_LD_max = parameters.get_max_long_deletion_length(); //fetch max length of long deletion
-    for (int i = 0; i < num_long_del; i++){ //create long deletion data for the cell to add to the chromosomes
-        int del_length = rng::int_sample(length_LD_min, length_LD_max); //pick a random length for each long deletion
+    double SVfreq = parameters.get_structural_variation_frequency();
+    double mean_num_long_del = parameters.get_proportion_long_deletions() * SVfreq;         //mean number of long deletions
+    double mean_num_bal_inv = parameters.get_proportion_balanced_inversions() * SVfreq;
+    double mean_num_bal_trans = parameters.get_proportion_balanced_tranlocations() * SVfreq;
+    double mean_num_indel = parameters.get_proportion_indels() * SVfreq;
+    int num_long_del = rng::poisson_sample(mean_num_long_del);                              //number of long deletions in the cell
+    int num_bal_inv = rng::poisson_sample(mean_num_bal_inv);
+    int num_bal_trans = rng::poisson_sample(mean_num_bal_trans);
+    int num_indel = rng::poisson_sample(mean_num_indel);
+
+    std::vector<std::tuple<int, int>> long_dels;                            //vector that holds the chromosome number and length of each long deletion
+    int length_LD_min = parameters.get_min_long_deletion_length();          //fetch min length of long deletion
+    int length_LD_max = parameters.get_max_long_deletion_length();          //fetch max length of long deletion
+    for (int i = 0; i < num_long_del; i++){                                 //create long deletion data for the cell to add to the chromosomes
+        int del_length = rng::int_sample(length_LD_min, length_LD_max);     //pick a random length for each long deletion
         if(num_chrom > 1){
-            int del_chrom = rng::int_sample(1, num_chrom); //pick a random chromosome for each long deletion
-            long_dels.push_back(std::make_tuple(del_chrom, del_length));
+            int del_chrom = rng::int_sample(1, num_chrom);                  //pick a random chromosome for each long deletion
+            long_dels.push_back(std::make_tuple(del_chrom, del_length));    //add mutation to long deletion list
         }
         else if(num_chrom == 1){
-            long_dels.push_back(std::make_tuple(1, del_length));
+            long_dels.push_back(std::make_tuple(1, del_length));            //edge case of single chromosome ref genome
         }
-        
     }
-    int toc = 1;
+
+    std::vector<std::tuple<int, int>> bal_invs;                             //balanced inversions handled similarly to long deletions
+    int length_BI_min = parameters.get_min_balanced_inversion_length();
+    int length_BI_max = parameters.get_max_balanced_inversion_length();
+    for (int i = 0; i < num_bal_inv; i++){
+        int inv_length = rng::int_sample(length_BI_min, length_BI_max);
+        if(num_chrom > 1){
+            int inv_chrom = rng::int_sample(1, num_chrom);
+            bal_invs.push_back(std::make_tuple(inv_chrom, inv_length));
+        }
+        else if(num_chrom == 1){
+            bal_invs.push_back(std::make_tuple(1, inv_length));
+        }
+    }
+
+    std::vector<std::tuple<int, int, int, int>> bal_translos;                                       //balanced translocations have 4 parameters because the mutations need pairs
+    int length_BT_min = parameters.get_min_balanced_translocation_length();
+    int length_BT_max = parameters.get_max_balanced_translocation_length();
+    if(num_chrom > 2){                                                                              //trivial case has chromosome number of 2, ie) single chromosome genome doesn't get balanced translocations
+        for (int i = 0; i < num_bal_trans; i++){
+            int bal_trans_length_1 = rng::int_sample(length_BT_min, length_BT_max);
+            int bal_trans_length_2 = rng::int_sample(length_BT_min, length_BT_max);
+            int bal_trans_chrom_1 = rng::int_sample(1, num_chrom - 1);
+            if(bal_trans_chrom_1 == num_chrom - 1){                                                 //avoid endpoint collisions in the chromosome selection logic
+                bal_translos.pushback(std::make_tuple(bal_trans_chrom_1, bal_trans_length_1, num_chrom, bal_trans_length_2));
+            }
+            else{
+                int bal_trans_chrom_2 = rng::int_sample(bal_trans_chrom_1 + 1, num_chrom);
+                bal_translos.pushback(std::make_tuple(bal_trans_chrom_1, bal_trans_length_1, bal_trans_chrom_2, bal_trans_length_2));
+            }
+        }
+    }
+    else if(num_chrom == 2){
+        for (int i = 0; i < num_bal_trans; i++){
+            int bal_trans_length_1 = rng::int_sample(length_BT_min, length_BT_max);
+            int bal_trans_length_2 = rng::int_sample(length_BT_min, length_BT_max);
+            bal_translos.pushback(std::make_tuple(1, bal_trans_length_1, 2, bal_trans_length_2));
+        }
+    }
+    std::vector<std::tuple<std::string, std::string>> transChroms;                                     //vector to hold header and sequence for translocated chromosomes
+
+    std::vector<std::tuple<int, int, int>> indels;                                                 
+    int length_ID_min = parameters.get_min_indel_length();
+    int length_ID_max = parameters.get_max_indel_length();
+    for (int i = 0; i < num_indel; i++){
+        int coinFlip = rng::int_sample(0,1);
+        int indel_length = rng::int_sample(length_ID_min, length_ID_max);
+        if(num_chrom > 1){
+            int indel_chrom = rng::int_sample(1, num_chrom);
+            indels.push_back(std::make_tuple(coinFlip, indel_chrom, indel_length));
+        }
+        else if(num_chrom == 1){
+            indels.push_back(std::make_tuple(coinFlip, 1, indel_length));
+        }
+    }
+    std::vector<std::tuple<std::string, std::string>> indelChroms;
+
+    int chromCount = 1;
     while (readFastaMemoryMap(genomeTemplate_data, templateSize, position, chromID_A, chromSeq_A, chromID_B, chromSeq_B)){// Get forward, backward sequences and their repective IDs for each chroms, one at a time
         long seq_length = chromSeq_A.size();                                                                              // Sequence length is same for both A and B 
         for(int i = 0; i < long_dels.size(); i++){                                                                        // check if current chromosome being processed gets a mutation from the mutation grid
-            if(toc == std::get<0>(long_dels[i])){                                                                                   // if chromosome number is chromosome that gets a mutation add the mutation
-                int proc = rng::int_sample(1, seq_length);                                                                // pick mutation loacation on sequence
-                //std::cout<<"\n ----- Mutation ----- "<< "Chromosome: " << toc << " Position: " << proc << std::endl;
+            if(chromCount == std::get<0>(long_dels[i])){                                                                                   // if chromosome number is chromosome that gets a mutation add the mutation
+                int mutLocation = rng::int_sample(1, seq_length);                                                                // pick mutation loacation on sequence
+                //std::cout<<"\n ----- Mutation ----- "<< "Chromosome: " << chromCount << " Position: " << proc << std::endl;
                 int length = std::get<1>(long_dels[i]);
-                int start = proc - seqStartIndex - 1;
+                int start = mutLocation - seqStartIndex - 1;
                 for (int k = 0; k <= length; k++) {
                     int idx = start + k;
                     if (idx < 0 || idx >= seq_length) {
@@ -837,11 +902,98 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                     }
                     chromSeq_B[seq_length - idx] = 'N';
                 }
-                const std::string long_deletion_data = fileName + ", chromosome: " + std::to_string(toc) + ", long deletion at position " + std::to_string(proc) + " of length " + std::to_string(length) + "\n";
+                const std::string long_deletion_data = fileName + ", chromosome: " + std::to_string(chromCount) + ", long deletion at position " + std::to_string(mutLocation) + " of length " + std::to_string(length) + "\n";
                 report_mutations(mutationFile, long_deletion_data);
                 
             }
-        }  
+        }
+        for(int i = 0; i < bal_invs.size(); i++){
+            if(chromCount == std::get<0>(bal_invs[i])){
+                int mutLocation = rng::int_sample(1, seq_length);
+                int length = std::get<1>(bal_invs[i]);
+                int start = mutLocation - seqStartIndex - 1;
+                for (int k = 0; k <= length; k++) {
+                    int idx = start + k;
+                    if (idx < 0 || idx >= seq_length) {
+                        break;
+                    }
+                    switch(chromSeq_A[idx]){
+                        case 'A':                                                                                     // Generate complementary base values accordingly
+                        chromSeq_A[idx]='T'; break;
+                        case 'C':
+                        chromSeq_A[idx]='G'; break;
+                        case 'G':
+                        chromSeq_A[idx]='C'; break;
+                        case 'T':
+                        chromSeq_A[idx]='A'; break;
+                        default:
+                        chromSeq_A[idx]='N';
+                    }
+                }
+                for (int k = 0; k <= length; ++k) {
+                    int idx = start + k + 1;
+                    if (idx < 0 || idx >= seq_length) {
+                        break;
+                    }
+                    switch(chromSeq_B[seq_length - idx]){
+                        case 'A':                                                                                     // Generate complementary base values accordingly
+                        chromSeq_B[seq_length - idx]='T'; break;
+                        case 'C':
+                        chromSeq_B[seq_length - idx]='G'; break;
+                        case 'G':
+                        chromSeq_B[seq_length - idx]='C'; break;
+                        case 'T':
+                        chromSeq_B[seq_length - idx]='A'; break;
+                        default:
+                        chromSeq_B[seq_length - idx]='N';
+                    }
+                }
+            }
+        }
+        for(int i = 0; i < bal_translos.size(); i++){
+            if(chromCount == std::get<0>(bal_translos[i])){
+                transChroms.pushback(std::make_tuple(chromID_A, ""));
+                transChroms.pushback(std::make_tuple(chromID_B, ""));
+                int length = std::get<1>(bal_translos[i]);
+                int mutLocation = seq_length - length;
+                int start = seqStartIndex - 1;
+                for (int k = 0; k <= mutLocation; k++) {
+                    int idx = start + k;
+                    if (idx < 0 || idx >= seq_length) {
+                        break;
+                    }
+                    std::get<1>(transChroms[i]) += chromSeq_A[idx];
+                }
+                for (int k = 0; k <= mutLocation; ++k) {
+                    int idx = start + k + 1;
+                    if (idx < 0 || idx >= seq_length) {
+                        break;
+                    }
+                    std::get<1>(transChroms[i+1]) += chromSeq_B[seq_length - idx];
+                }
+            }
+            if(chromCount == std::get<2>(bal_translos[i])){
+                int length = std::get<3>(bal_translos[i]);
+                int mutLocation = seq_length - length;
+                int start = mutLocation - seqStartIndex - 1;
+                for (int k = 0; k <= length; k++) {
+                    int idx = start + k;
+                    if (idx < 0 || idx >= seq_length) {
+                        break;
+                    }
+                    std::get<1>(transChroms[i]) += chromSeq_A[idx];
+                }
+                for (int k = 0; k <= length; ++k) {
+                    int idx = start + k + 1;
+                    if (idx < 0 || idx >= seq_length) {
+                        break;
+                    }
+                    std::get<1>(transChroms[i+1]) += chromSeq_B[seq_length - idx];
+                }
+            }
+
+        }
+
         batch_buffer.push_back(chromID_A+"\n"+chromSeq_A+"\n");
         chrm_seg_weights.push_back(0.0);                                                                    // Corresponds to the chromosome ID
         chrm_seg_weights.push_back(static_cast<double>(chromSeq_A.size())/total_seq_length);            

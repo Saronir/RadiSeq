@@ -103,13 +103,13 @@ number_of_cells_to_mutate                   = 10                      # Specify 
 
 number_chromo				     = 1			# Default number of chromosomes per cell.
 
-#proportion_balanced_inversions              = 0.50                    # Fraction of mutations that are balanced inversions. Expects a double between 0 and 1.
+proportion_balanced_inversions              = 0.50                    # Fraction of mutations that are balanced inversions. Expects a double between 0 and 1.
 
-#min_balanced_inversion_length		     = 50		      # Minimum number of base pairs a balanced inversion can be.
+min_balanced_inversion_length		     = 50		      # Minimum number of base pairs a balanced inversion can be.
 
-#max_balanced_inversion_length               = 10000		      # Maximum number of base pairs a balanced inversion can be.
+max_balanced_inversion_length               = 10000		      # Maximum number of base pairs a balanced inversion can be.
 
-#proportion_balanced_translocations          = 0.20                    # Fraction of mutations that are balanced translocations. Expects a double between 0 and 1.
+proportion_balanced_translocations          = 0.20                    # Fraction of mutations that are balanced translocations. Expects a double between 0 and 1.
 
 #min_balanced_translocation_length_a         = 5000                  # Minimum length from end of chromosome 'a' that a balanced translocation can be.
 
@@ -119,7 +119,11 @@ number_chromo				     = 1			# Default number of chromosomes per cell.
 
 #max_balanced_translocation_length_b         = 1000000                  # Minimum length from end of chromosome 'b' that a balanced translocation can be.
 
-#translocation_pairing_distribution_path     = ""                       # Default path for translocation pairing function.  
+#translocation_pairing_distribution_path     = ""                       # Default path for translocation pairing function.
+
+min_balanced_translocation_length	     = 5000                    # Minimum length a balanced translocation can be
+
+max_balanced_translocation_length	     = 100000                    # Maximum length a balanced translocation can be 
 
 proportion_long_deletions                   = 0.20                    # Fraction of mutations that are long deletions. Expects a double between 0 and 1.
 

@@ -60,9 +60,18 @@ class NGSParameters{
     std::string fastq_filename_prefix;                                           // String to hold the user-specified fastq output filename prefix
     bool is_summary_report{false};                                               // True if user wishes to generate a summary report at the end of the run
     double structural_variation_frequency;                                       // Frequency of mutations for inserting mutations directly into a genome
-    double proportion_long_deletion;
+    double proportion_long_deletions;
+    double proportion_balanced_inversions;
+    double proportion_balanced_translocations;
+    double proportion_indels:
     int min_long_deletion_length;
     int max_long_deletion_length;
+    int min_balanced_inversion_length;
+    int max_balanced_inversion_length;
+    int min_balanced_translocation_length;
+    int max_balanced_translocation_length;
+    int min_indel_length;
+    int max_indel_length;
     int number_of_cells_to_mutate;
     int number_chromo;
 
@@ -206,13 +215,40 @@ public:
     double get_structural_variation_frequency();
 
     void set_proportion_long_deletions(std::string*);
-    double get_proportion_long_deletion();
+    double get_proportion_long_deletions();
+
+    void set_proportion_balanced_inversions(std::string*);
+    double get_proportion_balanced_inversions();
+
+    void set_proportion_balanced_translocations(std::string*)
+    double get_proportion_balanced_translocations();
+
+    void set_proportion_indels(std::string*);
+    double get_proportion_indels();
 
     void set_min_long_deletion_length(std::string*);
     int get_min_long_deletion_length();
 
+    void set_min_balanced_inversion_length(std::string*);
+    int get_min_balanced_inversion_length();
+
+    void set_min_balanced_translocation_length(std::string*);
+    int get_min_balanced_translocation_length();
+
+    void set_min_indel_length(std::string*);
+    int get_min_indel_length();
+
     void set_max_long_deletion_length(std::string*);
     int get_max_long_deletion_length();
+
+    void set_max_balanced_inversion_length(std::string*);
+    int get_max_balanced_inversion_length();
+
+    void set_max_balanced_translocation_length(std::string*);
+    int get_max_balanced_translocation_length();
+
+    void set_max_indel_length(std::string*);
+    int get_max_indel_length();
 
     void set_number_of_cells_to_mutate(std::string*);
     int get_number_of_cells_to_mutate();
