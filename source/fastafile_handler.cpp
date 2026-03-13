@@ -861,7 +861,8 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
             bal_translos.pushback(std::make_tuple(1, bal_trans_length_1, 2, bal_trans_length_2));
         }
     }
-    std::vector<std::tuple<std::string, std::string>> transChroms;                                     //vector to hold header and sequence for translocated chromosomes
+    std::vector<std::tuple<std::string, std::string, std::string, std::string>> transChromsA;                                     //vector to hold header and sequence for translocated chromosomes
+    std::vector<std::tuple<std::string, std::string, std::string, std::string>> transChromsB;
 
     std::vector<std::tuple<int, int, int>> indels;                                                 
     int length_ID_min = parameters.get_min_indel_length();
@@ -877,7 +878,8 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
             indels.push_back(std::make_tuple(coinFlip, 1, indel_length));
         }
     }
-    std::vector<std::tuple<std::string, std::string>> indelChroms;
+    std::vector<std::tuple<std::string, std::string>> indelChromsA;
+    std::vector<std::tuple<std::string, std::string>> indelChromsB;
 
     int chromCount = 1;
     while (readFastaMemoryMap(genomeTemplate_data, templateSize, position, chromID_A, chromSeq_A, chromID_B, chromSeq_B)){// Get forward, backward sequences and their repective IDs for each chroms, one at a time
@@ -952,44 +954,81 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
         }
         for(int i = 0; i < bal_translos.size(); i++){
             if(chromCount == std::get<0>(bal_translos[i])){
-                transChroms.pushback(std::make_tuple(chromID_A, ""));
-                transChroms.pushback(std::make_tuple(chromID_B, ""));
+                transChromsA.pushback(std::make_tuple(chromID_A, "", "", ""));
+                transChromsB.pushback(std::make_tuple(chromID_B, "", "", ""));
                 int length = std::get<1>(bal_translos[i]);
                 int mutLocation = seq_length - length;
                 int start = seqStartIndex - 1;
-                for (int k = 0; k <= mutLocation; k++) {
+                for (int k = 0; k < mutLocation; k++) {
                     int idx = start + k;
-                    if (idx < 0 || idx >= seq_length) {
+                    if (idx < 0 || idx > seq_length) {
                         break;
                     }
-                    std::get<1>(transChroms[i]) += chromSeq_A[idx];
+                    std::get<1>(transChromsA[i]) += chromSeq_A[idx];    //front fill leading translocated chromosome
                 }
-                for (int k = 0; k <= mutLocation; ++k) {
-                    int idx = start + k + 1;
-                    if (idx < 0 || idx >= seq_length) {
+                for (int k = mutLocation; k <= seq_length; k++) {
+                    int idx = start + k;
+                    if (idx < 0 || idx > seq_length) {
                         break;
                     }
-                    std::get<1>(transChroms[i+1]) += chromSeq_B[seq_length - idx];
+                    std::get<3>(transChromsA[i]) += chromSeq_A[idx];    //back fill trailing translocated chromosome
+                }
+                for (int k = 0; k < mutLocation; ++k) {
+                    int idx = start + k + 1;
+                    if (idx < 0 || idx > seq_length) {
+                        break;
+                    }
+                    std::get<1>(transChromsB[i]) += chromSeq_B[seq_length - idx];   //front fill rev-comp leading translocated chromosome
+                }
+                for (int k = mutLocation; k <= seq_length; ++k){
+                    int idx = start + k + 1;
+                    if (idx < 0 || idx > seq_length) {
+                        break;
+                    }
+                    std::get<3>(transChromsB[i]) += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing translocated chromosome
                 }
             }
             if(chromCount == std::get<2>(bal_translos[i])){
+                std::get<2>(transChromsA[i]) = chromID_A;
+                std::get<2>(transChromsB[i]) = chromID_B;
                 int length = std::get<3>(bal_translos[i]);
                 int mutLocation = seq_length - length;
                 int start = mutLocation - seqStartIndex - 1;
-                for (int k = 0; k <= length; k++) {
+                std::string frontTrailingA = "";
+                std::string frontTrailingB = "";
+                for (int k = 0; k < mutLocation; k++) { 
                     int idx = start + k;
-                    if (idx < 0 || idx >= seq_length) {
+                    if (idx < 0 || idx > seq_length) {
                         break;
                     }
-                    std::get<1>(transChroms[i]) += chromSeq_A[idx];
+                    frontTrailingA += chromSeq_A[idx];
+                    //std::get<3>(transChromsA[i]) += chromSeq_A[idx];    //front fill trailing translocated chromosome
                 }
-                for (int k = 0; k <= length; ++k) {
+                std::get<3>(transChromsA[i]) = frontTrailingA + std::get<3>(transChromsA[i]);
+                for (int k = mutLocation; k <= seq_length; k++) {
+                    int idx = start + k;
+                    if (idx < 0 || idx > seq_length) {
+                        break;
+                    }
+                    std::get<1>(transChromsA[i]) += chromSeq_A[idx];    //back fill leading translocated chromosome
+                }
+                for (int k = 0; k < mutLocation; ++k) {
                     int idx = start + k + 1;
-                    if (idx < 0 || idx >= seq_length) {
+                    if (idx < 0 || idx > seq_length) {
                         break;
                     }
-                    std::get<1>(transChroms[i+1]) += chromSeq_B[seq_length - idx];
+                    frontTrailingB = += chromSeq_B[seq_length - idx];
+                    //std::get<3>(transChromsB[i]) += chromSeq_B[seq_length - idx];   //front fill rev-comp trailing translocated chromosome
                 }
+                std::get<3>(transChromsB[i]) = frontTrailingB + std::get<3>(transChromsB[i]);
+                for (int k = mutLocation; k <= seq_length; ++k){
+                    int idx = start + k + 1;
+                    if (idx < 0 || idx > seq_length) {
+                        break;
+                    }
+                    std::get<1>(transChromsB[i]) += chromSeq_B[seq_length - idx];   //back fill rev-comp leading translocated chromosome
+                }
+            }
             }
 
         }
