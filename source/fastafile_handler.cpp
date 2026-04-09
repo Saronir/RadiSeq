@@ -809,6 +809,17 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
     int num_bal_trans = rng::poisson_sample(mean_num_bal_trans);
     int num_indel = rng::poisson_sample(mean_num_indel);
 
+    //sum the mutations and then distribute them to unique chromosomes, making sure you don't run out of chromosomes
+    //some loss of generality in doing this, but otherwise there are troubling end cases and logical sorting to deal with
+    int total_mutated_chromosomes = num_long_del + num_bal_inv + (2.0 * num_bal_trans) + num_indel;
+    std::vector<int> mutated_chromosomes = rng::unique_randoms(1, num_chrom, total_mutated_chromosomes);
+
+    //construct chromosome mutation matrix from data
+    /*
+        chromosome_number | chromosome_mutation | mutation_metadata |
+    
+    */
+
     std::vector<std::tuple<int, int>> long_dels;                            //vector that holds the chromosome number and length of each long deletion
     int length_LD_min = parameters.get_min_long_deletion_length();          //fetch min length of long deletion
     int length_LD_max = parameters.get_max_long_deletion_length();          //fetch max length of long deletion
@@ -872,10 +883,10 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
         int indel_length = rng::int_sample(length_ID_min, length_ID_max);
         if(num_chrom > 1){
             int indel_chrom = rng::int_sample(1, num_chrom);
-            indels.push_back(std::make_tuple(coinFlip, indel_chrom, indel_length));
+            indels.push_back(std::make_tuple(indel_chrom, coinFlip, indel_length));
         }
         else if(num_chrom == 1){
-            indels.push_back(std::make_tuple(coinFlip, 1, indel_length));
+            indels.push_back(std::make_tuple(1, coinFlip, indel_length));
         }
     }
     std::vector<std::tuple<std::string, std::string>> indelChromsA;
@@ -1060,14 +1071,14 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        std::get<1>(indelChromsB[i]) += chromSeq_B[seq_length - idx];   //front fill rev-comp leading translocated chromosome
+                        std::get<1>(indelChromsB[i]) += chromSeq_B[seq_length - idx];   //front fill rev-comp leading indel chromosome
                     }
                     for (int k = mutLocation + length; k <= seq_length; ++k){
                         int idx = start + k + 1;
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        std::get<1>(indelChromsB[i]) += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing translocated chromosome
+                        std::get<1>(indelChromsB[i]) += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing indel chromosome
                     }
                     
                 }
@@ -1094,7 +1105,7 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        std::get<1>(indelChromsB[i]) += chromSeq_B[seq_length - idx];   //front fill rev-comp leading translocated chromosome
+                        std::get<1>(indelChromsB[i]) += chromSeq_B[seq_length - idx];   //front fill rev-comp leading indel chromosome
                     }
                     std::get<1>(indelChromsB[i]) += random_insertion_rev_comp;
                     for (int k = mutLocation + length; k <= seq_length; ++k){
@@ -1102,16 +1113,72 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        std::get<1>(indelChromsB[i]) += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing translocated chromosome
+                        std::get<1>(indelChromsB[i]) += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing indel chromosome
                     }
                 }
 
             }
         }
-        if (chromCount == std::get<2>(bal_translos[i])){
+
+        //need some cheeky logic to make sure indels and translocations are handled correctly
+        if (chromCount == std::get<0>(bal_translos[i])){
+            break;
+        }
+        else if (chromCount == std::get<2>(bal_translos[i])){
+
+            batch_buffer.push_back(std::get<0>(transChromsA[i])+"\n"+std::get<1>(transChromsA[i]));
+            chrm_seg_weights.pushback(0.0);
+            chrm_seg_weights.pushback(static_cast<double>(std::get<1>(transChromsA[i]).size())/total_seq_length);
+            if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                double chrm_GC_fraction = GCBias::get_GCfraction(std::get<1>(transChromsA[i]));                                   // Get the GC fraction in the chromosome segment 
+                chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+            } 
+            batch_buffer.push_back(std::get<0>(transChromsB[i])+"\n"+std::get<1>(transChromsB[i]));
+            chrm_seg_weights.pushback(0.0);
+            chrm_seg_weights.pushback(static_cast<double>(std::get<1>(transChromsB[i]).size())/total_seq_length);
+            if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                double chrm_GC_fraction = GCBias::get_GCfraction(std::get<1>(transChromsB[i]));                                   // Get the GC fraction in the chromosome segment 
+                chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+            } 
+
+            batch_buffer.push_back(std::get<2>(transChromsA[i])+"\n"+std::get<3>(transChromsA[i]));
+            chrm_seg_weights.pushback(0.0);
+            chrm_seg_weights.pushback(static_cast<double>(std::get<3>(transChromsA[i]).size())/total_seq_length);
+            if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                double chrm_GC_fraction = GCBias::get_GCfraction(std::get<3>(transChromsA[i]));                                   // Get the GC fraction in the chromosome segment 
+                chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+            } 
+            batch_buffer.push_back(std::get<2>(transChromsB[i])+"\n"+std::get<3>(transChromsB[i]));
+            chrm_seg_weights.pushback(0.0);
+            chrm_seg_weights.pushback(static_cast<double>(std::get<3>(transChromsB[i]).size())/total_seq_length);
+            if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                double chrm_GC_fraction = GCBias::get_GCfraction(std::get<3>(transChromsB[i]));                                   // Get the GC fraction in the chromosome segment 
+                chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+            } 
 
         }
-        if ()
+        else if (chromCount == std::get<0>(indels[i])){
+            batch_buffer.push_back(std::get<0>(indelChromsA[i])+"\n"+std::get<1>(indelChromsA[i]));
+            chrm_seg_weights.pushback(0.0);
+            chrm_seg_weights.pushback(static_cast<double>(std::get<1>(indelChromsA[i]).size())/total_seq_length);
+            if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                double chrm_GC_fraction = GCBias::get_GCfraction(std::get<1>(indelChromsA[i]));                                   // Get the GC fraction in the chromosome segment 
+                chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+            } 
+            batch_buffer.push_back(std::get<0>(indelChromsB[i])+"\n"+std::get<1>(indelChromsB[i]));
+            chrm_seg_weights.pushback(0.0);
+            chrm_seg_weights.pushback(static_cast<double>(std::get<1>(indelChromsB[i]).size())/total_seq_length);
+            if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                double chrm_GC_fraction = GCBias::get_GCfraction(std::get<1>(indelChromsB[i]));                                   // Get the GC fraction in the chromosome segment 
+                chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+            }
+        }
         else{
             batch_buffer.push_back(chromID_A+"\n"+chromSeq_A+"\n");
             chrm_seg_weights.push_back(0.0);                                                                    // Corresponds to the chromosome ID
@@ -1129,14 +1196,16 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                 chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
                 chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
             }
-
-            if (batch_buffer.size() >= batchSize){                                                                  // Check if the batch buffer is full, and write it to the file if needed.
-                writeBatchToMMFile(batch_buffer, position_in_MM, outFileMapping, outFileSize, outFilePath);
-            }
-
-            toc++;
-            seqStartIndex += seq_length;
         }
+
+
+        if (batch_buffer.size() >= batchSize){                                                                  // Check if the batch buffer is full, and write it to the file if needed.
+            writeBatchToMMFile(batch_buffer, position_in_MM, outFileMapping, outFileSize, outFilePath);
+        }
+
+        toc++;
+        seqStartIndex += seq_length;
+        
     }
     writeBatchToMMFile(batch_buffer, position_in_MM, outFileMapping, outFileSize, outFilePath);                 // If there are unwritten data in batch buffer, write that too when the loop ends
     if (msync(outFileMapping, outFileSize, MS_SYNC) == -1){                                                     // After writing your data to the memory-mapped file using mmap, before closing the file, call msync to flush/sync the changes.
@@ -1189,4 +1258,17 @@ std::string reverseComplement(const std::string& dna) { //generate rev-comp of a
     }
 
     return result;
+}
+
+struct Mutation_Metadata{
+    std::string mutation_type = "none"; //none, longdel, balinv, baltrans, indel
+    int position = 0; //position on chromosome
+    int length = 0; //length of mutation
+    int pair = 0; //chromosome pair for translocations
+    std::string inordel = "none"; //none, ins, del
+}
+
+struct Chromosome_Metadata{
+    int chromosome_number = 0;
+    Mutation_Metadata mutation_metadata;
 }

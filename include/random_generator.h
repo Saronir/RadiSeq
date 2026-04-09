@@ -117,6 +117,33 @@ namespace rng{
         std::uniform_int_distribution<int> dist(lowerBound, upperBound);
         return dist(generator);
     }
+    inline std::vector<int> unique_random(int min, int max, std::size_t count) {
+        if (min > max) {
+            throw std::invalid_argument("min must be <= max");
+        }
+
+        std::size_t range = static_cast<std::size_t>(max - min + 1);
+
+        if (count > range) {
+            throw std::invalid_argument("count cannot be larger than range");
+        }
+
+        std::vector<int> values;
+        values.reserve(range);
+
+        for (int i = min; i <= max; ++i) {
+            values.push_back(i);
+        }
+
+        // Static generator so it's not re-seeded every call
+        static thread_local std::mt19937 gen(std::random_device{}());
+
+        std::shuffle(values.begin(), values.end(), gen);
+
+        values.resize(count);
+        return values;
+    }
+    
 
 }
 
