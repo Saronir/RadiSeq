@@ -11,6 +11,7 @@
 #include <random>
 #include <vector>
 #include <type_traits>
+#include <algorithm>
 
 
 namespace rng{
@@ -116,6 +117,11 @@ namespace rng{
         static thread_local std::mt19937 generator{std::random_device{}()};
         std::uniform_int_distribution<int> dist(lowerBound, upperBound);
         return dist(generator);
+    }
+    inline double double_sample_0to1() {
+        static thread_local std::mt19937 generator{std::random_device{}()};
+        static thread_local std::uniform_int_distribution<int> dist(0, 999999999);
+        return dist(generator) / 1e9;
     }
     inline std::vector<int> unique_random(int min, int max, std::size_t count) {
         if (min > max) {

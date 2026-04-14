@@ -814,87 +814,174 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
     int total_mutated_chromosomes = num_long_del + num_bal_inv + (2.0 * num_bal_trans) + num_indel;
     std::vector<int> mutated_chromosomes = rng::unique_randoms(1, num_chrom, total_mutated_chromosomes);
 
-    //construct chromosome mutation matrix from data
+    //construct chromosome data mutation matrix from params 
     /*
-        chromosome_number | chromosome_mutation | mutation_metadata |
+        chromosome_number | mutation_metadata 
     
     */
-
-    std::vector<std::tuple<int, int>> long_dels;                            //vector that holds the chromosome number and length of each long deletion
+    std::vector<Chromosome_Metadata> CData_Matrix; 
+    
+    //Populate mutation matrix with all required params besides location 
     int length_LD_min = parameters.get_min_long_deletion_length();          //fetch min length of long deletion
     int length_LD_max = parameters.get_max_long_deletion_length();          //fetch max length of long deletion
-    for (int i = 0; i < num_long_del; i++){                                 //create long deletion data for the cell to add to the chromosomes
-        int del_length = rng::int_sample(length_LD_min, length_LD_max);     //pick a random length for each long deletion
-        if(num_chrom > 1){
-            int del_chrom = rng::int_sample(1, num_chrom);                  //pick a random chromosome for each long deletion
-            long_dels.push_back(std::make_tuple(del_chrom, del_length));    //add mutation to long deletion list
-        }
-        else if(num_chrom == 1){
-            long_dels.push_back(std::make_tuple(1, del_length));            //edge case of single chromosome ref genome
-        }
+    for (int i = 0; i < num_long_del; i++){
+        Mutation_Metadata mut;
+        mut.mutation_type = "longdel";
+        mut.length = rng::int_sample(length_LD_min, length_LD_max);     //pick a random length for each long deletion
+        Chromosome_Metadata chrom;
+        chrom.chromosome_number = mutated_chromosomes[i];
+        chrom.mutation_metadata = mut;
+        CData_Matrix.pushback(chrom);
     }
 
-    std::vector<std::tuple<int, int>> bal_invs;                             //balanced inversions handled similarly to long deletions
     int length_BI_min = parameters.get_min_balanced_inversion_length();
     int length_BI_max = parameters.get_max_balanced_inversion_length();
     for (int i = 0; i < num_bal_inv; i++){
-        int inv_length = rng::int_sample(length_BI_min, length_BI_max);
-        if(num_chrom > 1){
-            int inv_chrom = rng::int_sample(1, num_chrom);
-            bal_invs.push_back(std::make_tuple(inv_chrom, inv_length));
-        }
-        else if(num_chrom == 1){
-            bal_invs.push_back(std::make_tuple(1, inv_length));
-        }
+        Mutation_Metadata mut;
+        mut.mutation_type = "balinv";
+        mut.length = rng::int_sample(length_BI_min, length_BI_max);
+        Chromosome_Metadata chrom;
+        chrom.chromosome_number = mutated_chromosomes[i + num_long_del];
+        chrom.mutation_metadata = mut;
+        CData_Matrix.pushback(chrom);
     }
 
-    std::vector<std::tuple<int, int, int, int>> bal_translos;                                       //balanced translocations have 4 parameters because the mutations need pairs
     int length_BT_min = parameters.get_min_balanced_translocation_length();
     int length_BT_max = parameters.get_max_balanced_translocation_length();
-    if(num_chrom > 2){                                                                              //trivial case has chromosome number of 2, ie) single chromosome genome doesn't get balanced translocations
-        for (int i = 0; i < num_bal_trans; i++){
-            int bal_trans_length_1 = rng::int_sample(length_BT_min, length_BT_max);
-            int bal_trans_length_2 = rng::int_sample(length_BT_min, length_BT_max);
-            int bal_trans_chrom_1 = rng::int_sample(1, num_chrom - 1);
-            if(bal_trans_chrom_1 == num_chrom - 1){                                                 //avoid endpoint collisions in the chromosome selection logic
-                bal_translos.pushback(std::make_tuple(bal_trans_chrom_1, bal_trans_length_1, num_chrom, bal_trans_length_2));
-            }
-            else{
-                int bal_trans_chrom_2 = rng::int_sample(bal_trans_chrom_1 + 1, num_chrom);
-                bal_translos.pushback(std::make_tuple(bal_trans_chrom_1, bal_trans_length_1, bal_trans_chrom_2, bal_trans_length_2));
-            }
-        }
-    }
-    else if(num_chrom == 2){
-        for (int i = 0; i < num_bal_trans; i++){
-            int bal_trans_length_1 = rng::int_sample(length_BT_min, length_BT_max);
-            int bal_trans_length_2 = rng::int_sample(length_BT_min, length_BT_max);
-            bal_translos.pushback(std::make_tuple(1, bal_trans_length_1, 2, bal_trans_length_2));
-        }
-    }
-    std::vector<std::tuple<std::string, std::string, std::string, std::string>> transChromsA;                                     //vector to hold header and sequence for translocated chromosomes
-    std::vector<std::tuple<std::string, std::string, std::string, std::string>> transChromsB;
+    for (int i = 0; i < num_bal_trans; i++){
+        Mutation_Metadata mut;
+        mut.mutation_type = "baltrans";
+        mut.length = rng::int_sample(length_BT_min, length_BT_max);
+        Chromosome_Metadata chrom;
+        chrom.chromosome_number = mutated_chromosomes[i + num_long_del + num_bal_inv];
+        mut.pair = mutated_chromosomes[i + num_long_del + num_bal_inv + num_bal_trans];
+        chrom.mutation_metadata = mut;
+        CData_Matrix.pushback(chrom);
 
-    std::vector<std::tuple<int, int, int>> indels;                                                 
+        Mutation_Metadata mut_pair;
+        mut_pair.mutation_type = "bal_trans";
+        mut_pair.length = rng::int_sample(length_BI_min, length_BI_max);
+        Chromosome_Metadata chrom_pair;
+        chrom_pair.chromosome_number = mut.pair;
+        mut_pair.pair = chrom.chromosome_number;
+        chrom_pair.mutation_metadata = mut_pair;
+        CData_Matrix.pushback(chrom_pair);
+    }
+
     int length_ID_min = parameters.get_min_indel_length();
     int length_ID_max = parameters.get_max_indel_length();
     for (int i = 0; i < num_indel; i++){
-        int coinFlip = rng::int_sample(0,1);
-        int indel_length = rng::int_sample(length_ID_min, length_ID_max);
-        if(num_chrom > 1){
-            int indel_chrom = rng::int_sample(1, num_chrom);
-            indels.push_back(std::make_tuple(indel_chrom, coinFlip, indel_length));
-        }
-        else if(num_chrom == 1){
-            indels.push_back(std::make_tuple(1, coinFlip, indel_length));
-        }
+        Mutation_Metadata mut;
+        mut.mutation_type = "indel";
+        mut.length = rng::int_sample(length_ID_min, length_ID_max);
+        Chromosome_Metadata chrom;
+        chrom.chromosome_number = mutated_chromosomes[i + num_long_del + num_bal_inv + 2 * num_bal_trans];
+        chrom.mutation_metadata = mut;
+        CData_Matrix.pushback(chrom);
     }
-    std::vector<std::tuple<std::string, std::string>> indelChromsA;
-    std::vector<std::tuple<std::string, std::string>> indelChromsB;
+    
+
+    // std::vector<std::tuple<int, int>> long_dels;                            //vector that holds the chromosome number and length of each long deletion
+    // int length_LD_min = parameters.get_min_long_deletion_length();          //fetch min length of long deletion
+    // int length_LD_max = parameters.get_max_long_deletion_length();          //fetch max length of long deletion
+    // for (int i = 0; i < num_long_del; i++){                                 //create long deletion data for the cell to add to the chromosomes
+    //     int del_length = rng::int_sample(length_LD_min, length_LD_max);     //pick a random length for each long deletion
+    //     if(num_chrom > 1){
+    //         int del_chrom = rng::int_sample(1, num_chrom);                  //pick a random chromosome for each long deletion
+    //         long_dels.push_back(std::make_tuple(del_chrom, del_length));    //add mutation to long deletion list
+    //     }
+    //     else if(num_chrom == 1){
+    //         long_dels.push_back(std::make_tuple(1, del_length));            //edge case of single chromosome ref genome
+    //     }
+    // }
+
+    // std::vector<std::tuple<int, int>> bal_invs;                             //balanced inversions handled similarly to long deletions
+    // int length_BI_min = parameters.get_min_balanced_inversion_length();
+    // int length_BI_max = parameters.get_max_balanced_inversion_length();
+    // for (int i = 0; i < num_bal_inv; i++){
+    //     int inv_length = rng::int_sample(length_BI_min, length_BI_max);
+    //     if(num_chrom > 1){
+    //         int inv_chrom = rng::int_sample(1, num_chrom);
+    //         bal_invs.push_back(std::make_tuple(inv_chrom, inv_length));
+    //     }
+    //     else if(num_chrom == 1){
+    //         bal_invs.push_back(std::make_tuple(1, inv_length));
+    //     }
+    // }
+
+    // std::vector<std::tuple<int, int, int, int>> bal_translos;                                       //balanced translocations have 4 parameters because the mutations need pairs
+    // int length_BT_min = parameters.get_min_balanced_translocation_length();
+    // int length_BT_max = parameters.get_max_balanced_translocation_length();
+    // if(num_chrom > 2){                                                                              //trivial case has chromosome number of 2, ie) single chromosome genome doesn't get balanced translocations
+    //     for (int i = 0; i < num_bal_trans; i++){
+    //         int bal_trans_length_1 = rng::int_sample(length_BT_min, length_BT_max);
+    //         int bal_trans_length_2 = rng::int_sample(length_BT_min, length_BT_max);
+    //         int bal_trans_chrom_1 = rng::int_sample(1, num_chrom - 1);
+    //         if(bal_trans_chrom_1 == num_chrom - 1){                                                 //avoid endpoint collisions in the chromosome selection logic
+    //             bal_translos.pushback(std::make_tuple(bal_trans_chrom_1, bal_trans_length_1, num_chrom, bal_trans_length_2));
+    //         }
+    //         else{
+    //             int bal_trans_chrom_2 = rng::int_sample(bal_trans_chrom_1 + 1, num_chrom);
+    //             bal_translos.pushback(std::make_tuple(bal_trans_chrom_1, bal_trans_length_1, bal_trans_chrom_2, bal_trans_length_2));
+    //         }
+    //     }
+    // }
+    // else if(num_chrom == 2){
+    //     for (int i = 0; i < num_bal_trans; i++){
+    //         int bal_trans_length_1 = rng::int_sample(length_BT_min, length_BT_max);
+    //         int bal_trans_length_2 = rng::int_sample(length_BT_min, length_BT_max);
+    //         bal_translos.pushback(std::make_tuple(1, bal_trans_length_1, 2, bal_trans_length_2));
+    //     }
+    // }
+    // std::vector<std::tuple<std::string, std::string, std::string, std::string>> transChromsA;                                     //vector to hold header and sequence for translocated chromosomes
+    // std::vector<std::tuple<std::string, std::string, std::string, std::string>> transChromsB;
+
+    // std::vector<std::tuple<int, int, int>> indels;                                                 
+    // int length_ID_min = parameters.get_min_indel_length();
+    // int length_ID_max = parameters.get_max_indel_length();
+    // for (int i = 0; i < num_indel; i++){
+    //     int coinFlip = rng::int_sample(0,1);
+    //     int indel_length = rng::int_sample(length_ID_min, length_ID_max);
+    //     if(num_chrom > 1){
+    //         int indel_chrom = rng::int_sample(1, num_chrom);
+    //         indels.push_back(std::make_tuple(indel_chrom, coinFlip, indel_length));
+    //     }
+    //     else if(num_chrom == 1){
+    //         indels.push_back(std::make_tuple(1, coinFlip, indel_length));
+    //     }
+    // }
+    // std::vector<std::tuple<std::string, std::string>> indelChromsA;
+    // std::vector<std::tuple<std::string, std::string>> indelChromsB;
 
     int chromCount = 1;
     while (readFastaMemoryMap(genomeTemplate_data, templateSize, position, chromID_A, chromSeq_A, chromID_B, chromSeq_B)){// Get forward, backward sequences and their repective IDs for each chroms, one at a time
-        long seq_length = chromSeq_A.size();                                                                              // Sequence length is same for both A and B 
+        long seq_length = chromSeq_A.size();
+        
+        for (int i = 0; i < total_mutated_chromosomes; i++){
+            if (CData_Matrix[i].chromosome_number == chromCount){ //if current chromosome has a mutation
+                if{CData_Matrix[i].}
+            }
+            else{ //otherwise write out the chromosome as it is in the reference genome
+                batch_buffer.push_back(chromID_A+"\n"+chromSeq_A+"\n");
+                chrm_seg_weights.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                chrm_seg_weights.push_back(static_cast<double>(chromSeq_A.size())/total_seq_length);            
+                if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                    double chrm_GC_fraction = GCBias::get_GCfraction(chromSeq_A);                                   // Get the GC fraction in the chromosome segment 
+                    chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                    chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+                }  
+                batch_buffer.push_back(chromID_B+"\n"+chromSeq_B+"\n");
+                chrm_seg_weights.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                chrm_seg_weights.push_back(static_cast<double>(chromSeq_B.size())/total_seq_length);            
+                if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                    double chrm_GC_fraction = GCBias::get_GCfraction(chromSeq_B);                                   // Get the GC fraction in the chromosome segment 
+                    chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                    chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+                }
+            }
+        }
+        
+        // Sequence length is same for both A and B 
         for(int i = 0; i < long_dels.size(); i++){                                                                        // check if current chromosome being processed gets a mutation from the mutation grid
             if(chromCount == std::get<0>(long_dels[i])){                                                                                   // if chromosome number is chromosome that gets a mutation add the mutation
                 int mutLocation = rng::int_sample(1, seq_length);                                                                // pick mutation loacation on sequence
@@ -1262,10 +1349,11 @@ std::string reverseComplement(const std::string& dna) { //generate rev-comp of a
 
 struct Mutation_Metadata{
     std::string mutation_type = "none"; //none, longdel, balinv, baltrans, indel
+    double normalized_position = 0.0;
     int position = 0; //position on chromosome
     int length = 0; //length of mutation
     int pair = 0; //chromosome pair for translocations
-    std::string inordel = "none"; //none, ins, del
+    std::string inordel = "none"; //none, in, del
 }
 
 struct Chromosome_Metadata{
