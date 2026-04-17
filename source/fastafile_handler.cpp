@@ -966,42 +966,121 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
         for (int i = 0; i < total_mutated_chromosomes; i++){
             if (cdata_matrix[i].chromosome_number == chromCount){ //if current chromosome has a mutation
                 if (cdata_matrix[i].mutation_metadata.mutation_type == "longdel"){
+                    cdata_matrix[i].chromA_id = chromID_A;
+                    cdata_matrix[i].chromB_id = chromID_B;
                     int mutLocation = static_cast<int>(std::floor(cdata_matrix[i].mutation_metadata.normalized_position * seq_length));            // pick mutation loacation on sequence
+                    cdata_matrix[i].mutation_metadata.position = mutLocation;
                     int length = cdata_matrix[i].mutation_metadata.length;
-                    int start = mutLocation - seqStartIndex - 1;
-                    for (int k = 0; k < mutLocation; k++) { 
-                        int idx = start + k;
+                    long long start = 0;
+                    for (long long k = 0; k < mutLocation; k++) { 
+                        long long idx = start + k;
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        std::get<1>(indelChromsA[i]) += chromSeq_A[idx];
+                        cdata_matrix[i].chromA_seq += chromSeq_A[idx];
                     }
-                    for (int k = mutLocation + length; k <= seq_length; k++) {
-                        int idx = start + k;
+                    for (long long k = mutLocation + length; k < seq_length; k++) {
+                        long long idx = start + k;
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        std::get<1>(indelChromsA[i]) += chromSeq_A[idx];  
+                        cdata_matrix[i].chromA_seq += chromSeq_A[idx];
                     }
-                    for (int k = 0; k < mutLocation; ++k) {
-                        int idx = start + k + 1;
+                    for (long long k = 0; k < mutLocation; ++k) {
+                        long long idx = start + k + 1;
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        std::get<1>(indelChromsB[i]) += chromSeq_B[seq_length - idx];   //front fill rev-comp leading indel chromosome
+                        cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //front fill rev-comp leading indel chromosome
                     }
-                    for (int k = mutLocation + length; k <= seq_length; ++k){
-                        int idx = start + k + 1;
+                    for (long long k = mutLocation + length; k <= seq_length; ++k){
+                        long long idx = start + k + 1;
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        std::get<1>(indelChromsB[i]) += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing indel chromosome
+                        cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing indel chromosome
                     }
+                    //write-out function calls
                     const std::string long_deletion_data = fileName + ", chromosome: " + std::to_string(chromCount) + ", long deletion at position " + std::to_string(mutLocation) + " of length " + std::to_string(length) + "\n";
                     report_mutations(mutationFile, long_deletion_data);
+                    //push mutated chromosome into buffer
+                    batch_buffer.push_back(cdata_matrix[i].chromA_id+"\n"+cdata_matrix[i].chromA_seq+"\n");
+                    chrm_seg_weights.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                    chrm_seg_weights.push_back(static_cast<double>(cdata_matrix[i].chromA_seq.size())/total_seq_length);            
+                    if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                        double chrm_GC_fraction = GCBias::get_GCfraction(cdata_matrix[i].chromA_seq);                                   // Get the GC fraction in the chromosome segment 
+                        chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                        chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+                    }  
+                    batch_buffer.push_back(cdata_matrix[i].chromB_id+"\n"+cdata_matrix[i].chromB_seq+"\n");
+                    chrm_seg_weights.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                    chrm_seg_weights.push_back(static_cast<double>(cdata_matrix[i].chromB_seq.size())/total_seq_length);            
+                    if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                        double chrm_GC_fraction = GCBias::get_GCfraction(cdata_matrix[i].chromB_seq);                                   // Get the GC fraction in the chromosome segment 
+                        chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                        chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+                    }  
+
                 }
                 else if (cdata_matrix[i].mutation_metadata.mutation_type == "balinv"){
-                    
+                    cdata_matrix[i].chromA_id = chromID_A;
+                    cdata_matrix[i].chromB_id = chromID_B;
+                    int mutLocation = static_cast<int>(std::floor(cdata_matrix[i].mutation_metadata.normalized_position * seq_length));            // pick mutation loacation on sequence
+                    cdata_matrix[i].mutation_metadata.position = mutLocation;
+                    int length = cdata_matrix[i].mutation_metadata.length;
+                    long long start = mutLocation;
+                    for (int k = 0; k < length; k++) {
+                        int idx = start + k;
+                        if (idx < 0 || idx > seq_length) {
+                            break;
+                        }
+                        switch(chromSeq_A[idx]){
+                            case 'A':                                                                                     // Generate complementary base values accordingly
+                            chromSeq_A[idx]='T'; break;
+                            case 'C':
+                            chromSeq_A[idx]='G'; break;
+                            case 'G':
+                            chromSeq_A[idx]='C'; break;
+                            case 'T':
+                            chromSeq_A[idx]='A'; break;
+                            default:
+                            chromSeq_A[idx]='N';
+                        }
+                    }
+                    for (int k = 0; k < length; ++k) {
+                        int idx = start + k + 1;
+                        if (idx < 0 || idx > seq_length) {
+                            break;
+                        }
+                        switch(chromSeq_B[seq_length - idx]){
+                            case 'A':                                                                                     // Generate complementary base values accordingly
+                            chromSeq_B[seq_length - idx]='T'; break;
+                            case 'C':
+                            chromSeq_B[seq_length - idx]='G'; break;
+                            case 'G':
+                            chromSeq_B[seq_length - idx]='C'; break;
+                            case 'T':
+                            chromSeq_B[seq_length - idx]='A'; break;
+                            default:
+                            chromSeq_B[seq_length - idx]='N';
+                        }
+                    }
+                    batch_buffer.push_back(chromID_A+"\n"+chromSeq_A+"\n");
+                    chrm_seg_weights.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                    chrm_seg_weights.push_back(static_cast<double>(chromSeq_A.size())/total_seq_length);            
+                    if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                        double chrm_GC_fraction = GCBias::get_GCfraction(chromSeq_A);                                   // Get the GC fraction in the chromosome segment 
+                        chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                        chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
+                    }  
+                    batch_buffer.push_back(chromID_B+"\n"+chromSeq_B+"\n");
+                    chrm_seg_weights.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                    chrm_seg_weights.push_back(static_cast<double>(chromSeq_B.size())/total_seq_length);            
+                    if (GCslope != 0.0){                                                                                // Go through the calculation of GC bias only if there is a non-zero bias set
+                        double chrm_GC_fraction = GCBias::get_GCfraction(chromSeq_B);                                   // Get the GC fraction in the chromosome segment 
+                        chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
+                        chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment 
+                    }
                 }
                 else if (cdata_matrix[i].mutation_metadata.mutation_type == "baltrans"){
                     
@@ -1428,7 +1507,9 @@ struct Mutation_Metadata{
 
 struct Chromosome_Metadata{
     int chromosome_number = 0;
-    std::string chrom_id;
-    std::string chrom_seq;
+    std::string chromA_id = "";
+    std::string chromA_seq = "";
+    std::string chromB_id = "";
+    std::string chromB_seq = "";
     Mutation_Metadata mutation_metadata;
 }
