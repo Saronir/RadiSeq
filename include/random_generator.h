@@ -149,6 +149,24 @@ namespace rng{
         values.resize(count);
         return values;
     }
+    inline std::vector<int> non_unique_random(int min, int max, std::size_t count) {
+        std::vector<int> result;
+
+        std::random_device rd;
+        std::mt19937 gen(rd()); // random engine
+        std::uniform_int_distribution<> dist(min, max);
+
+        for (int i = 0; i < count; ++i) {
+            result.push_back(dist(gen));
+        }
+
+        return result;
+    }
+    template <typename T>
+    inline void shuffleVector(std::vector<T>& v) {
+        static std::mt19937 gen(std::random_device{}());
+        std::shuffle(v.begin(), v.end(), gen);
+    }
     
 
 }

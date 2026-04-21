@@ -813,7 +813,7 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
     //sum the mutations and then distribute them to unique chromosomes, making sure you don't run out of chromosomes
     //some loss of generality in doing this, but otherwise there are troubling end cases and logical sorting to deal with
     int total_mutated_chromosomes = num_long_del + num_bal_inv + (2.0 * num_bal_trans) + num_indel;
-    std::vector<int> mutated_chromosomes = rng::unique_randoms(1, num_chrom, total_mutated_chromosomes);
+    std::vector<int> mutated_chromosomes = rng::non_unique_randoms(1, num_chrom, total_mutated_chromosomes);
 
     //construct chromosome data mutation matrix from params 
     /*
@@ -821,7 +821,21 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
     
     */
     std::vector<Chromosome_Metadata> cdata_matrix; 
-    
+    std::vector<Mutation_Metadata> mdata_matrix
+
+    for (int i = 0; i < num_chrom; i++){
+        int counter = 0;
+        for (int i = 0; i < total_mutated_chromosomes; i++){
+            if (mutated_chromosomes[i] == i + 1)
+            counter += 1;
+        }
+        Chromosome_Metadata chrom;
+        chrom.chromosome_number = i + 1;
+        chrom.num_mutations = counter;
+        cdata_matrix.pushback(chrom);
+    }
+
+
     //Populate mutation matrix with all required params besides location 
     int length_LD_min = parameters.get_min_long_deletion_length();          //fetch min length of long deletion
     int length_LD_max = parameters.get_max_long_deletion_length();          //fetch max length of long deletion
@@ -830,10 +844,11 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
         mut.mutation_type = "longdel";
         mut.length = rng::int_sample(length_LD_min, length_LD_max);     //pick a random length for each long deletion
         mut.normalized_position = rng::double_sample_0to1();
-        Chromosome_Metadata chrom;
-        chrom.chromosome_number = mutated_chromosomes[i];
-        chrom.mutation_metadata = mut;
-        cdata_matrix.pushback(chrom);
+        // Chromosome_Metadata chrom;
+        // chrom.chromosome_number = mutated_chromosomes[i];
+        // chrom.mutation_metadata = mut;
+        // cdata_matrix.pushback(chrom);
+        mdata_matrix.pushback(mut);
     }
 
     int length_BI_min = parameters.get_min_balanced_inversion_length();
@@ -843,10 +858,11 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
         mut.mutation_type = "balinv";
         mut.length = rng::int_sample(length_BI_min, length_BI_max);
         mut.normalized_position = rng::double_sample_0to1();
-        Chromosome_Metadata chrom;
-        chrom.chromosome_number = mutated_chromosomes[i + num_long_del];
-        chrom.mutation_metadata = mut;
-        cdata_matrix.pushback(chrom);
+        // Chromosome_Metadata chrom;
+        // chrom.chromosome_number = mutated_chromosomes[i + num_long_del];
+        // chrom.mutation_metadata = mut;
+        // cdata_matrix.pushback(chrom);
+        mdata_matrix.pushback(mut);
     }
 
     int length_BT_min = parameters.get_min_balanced_translocation_length();
@@ -855,20 +871,22 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
         Mutation_Metadata mut;
         mut.mutation_type = "baltrans";
         mut.length = rng::int_sample(length_BT_min, length_BT_max);
-        Chromosome_Metadata chrom;
-        chrom.chromosome_number = mutated_chromosomes[i + num_long_del + num_bal_inv];
+        //Chromosome_Metadata chrom;
+        //chrom.chromosome_number = mutated_chromosomes[i + num_long_del + num_bal_inv];
         mut.pair = mutated_chromosomes[i + num_long_del + num_bal_inv + num_bal_trans];
-        chrom.mutation_metadata = mut;
-        cdata_matrix.pushback(chrom);
+        //chrom.mutation_metadata = mut;
+        //cdata_matrix.pushback(chrom);
+        mdata_matrix.pushback(mut);
 
         Mutation_Metadata mut_pair;
         mut_pair.mutation_type = "bal_trans";
         mut_pair.length = rng::int_sample(length_BI_min, length_BI_max);
-        Chromosome_Metadata chrom_pair;
-        chrom_pair.chromosome_number = mut.pair;
+        //Chromosome_Metadata chrom_pair;
+        //chrom_pair.chromosome_number = mut.pair;
         mut_pair.pair = chrom.chromosome_number;
-        chrom_pair.mutation_metadata = mut_pair;
-        cdata_matrix.pushback(chrom_pair);
+        //hrom_pair.mutation_metadata = mut_pair;
+        //cdata_matrix.pushback(chrom_pair);
+        mdata_matrix.pushback(mut_pair);
     }
 
     int length_ID_min = parameters.get_min_indel_length();
@@ -878,13 +896,44 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
         mut.mutation_type = "indel";
         mut.length = rng::int_sample(length_ID_min, length_ID_max);
         mut.normalized_position = rng::double_sample_0to1();
-        Chromosome_Metadata chrom;
-        chrom.chromosome_number = mutated_chromosomes[i + num_long_del + num_bal_inv + 2 * num_bal_trans];
-        chrom.mutation_metadata = mut;
-        cdata_matrix.pushback(chrom);
+        int coinFlip = rng::int_sample(0,1);
+        if (coinFlip == 0){
+            mut.inordel = "in";
+        }
+        else if (coinFlip == 1){
+            mut.inordel = "del";
+        }
+        else{
+            //throw some exception here
+        }
+        //Chromosome_Metadata chrom;
+        //chrom.chromosome_number = mutated_chromosomes[i + num_long_del + num_bal_inv + 2 * num_bal_trans];
+        //chrom.mutation_metadata = mut;
+        //cdata_matrix.pushback(chrom);
+        mdata_matrix.pushback(mut);
     }
 
-
+    //shuffle up the mutation metadata matrix
+    rng::shuffleVector(mdata_matrix);
+    //put the mutations into the mutated chromosomes
+    int mut_used = 0;
+    for (int i = 0; i < num_chrom; i++){
+        if (cdata_matrix[i].num_mutations == 0){
+            continue;
+        }
+        else{
+            for (int j = 0; j < cdata_matrix[i].num_mutations; j++){
+                cdata_matrix[i].mdata_matrix.pushback(mdata_matrix[j + mut_used]);
+                mut_used += 1;
+            }
+        }
+    }
+    if (mut_used == total_mutated_chromosomes){
+        continue;
+    }
+    else{
+        //throw exception here cause something wrong
+    }
     
 
     // std::vector<std::tuple<int, int>> long_dels;                            //vector that holds the chromosome number and length of each long deletion
@@ -1020,6 +1069,7 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                         chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
                         chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
                     }  
+                    //CHANGE TO MAKE: GET RID OF MUTATION IN CDMATRIX TO SAVE A LITTLE SPACE IN PROGRAM MEMORY
 
                 }
                 else if (cdata_matrix[i].mutation_metadata.mutation_type == "balinv"){
@@ -1507,9 +1557,10 @@ struct Mutation_Metadata{
 
 struct Chromosome_Metadata{
     int chromosome_number = 0;
+    int num_mutations = 0;
     std::string chromA_id = "";
     std::string chromA_seq = "";
     std::string chromB_id = "";
     std::string chromB_seq = "";
-    Mutation_Metadata mutation_metadata;
+    std::vector<Mutation_Metadata> mdata_matrix;
 }
