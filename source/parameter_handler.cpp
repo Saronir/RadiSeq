@@ -201,7 +201,7 @@ void NGSParameters::set_parameters(std::string* paramName, std::string* paramVal
         set_min_long_deletion_length(paramValue);
     }
     else if (*paramName == "min_balanced_invertion_length"){
-        set_min_balanced_invertion_length(paramValue);
+        set_min_balanced_inversion_length(paramValue);
     }
     else if (*paramName == "min_balanced_translocation_length"){
         set_min_balanced_translocation_length(paramValue);
@@ -213,7 +213,7 @@ void NGSParameters::set_parameters(std::string* paramName, std::string* paramVal
         set_max_long_deletion_length(paramValue);
     }
     else if (*paramName == "max_balanced_invertion_length"){
-        set_max_balanced_invertion_length(paramValue);
+        set_max_balanced_inversion_length(paramValue);
     }
     else if (*paramName == "max_balanced_translocation_length"){
         set_max_balanced_translocation_length(paramValue);
@@ -509,6 +509,12 @@ void NGSParameters::set_min_balanced_translocation_length(std::string* paramValu
 void NGSParameters::set_max_balanced_translocation_length(std::string* paramValue){
     max_balanced_translocation_length = std::stoi(*paramValue);
 }
+void NGSParameters::set_min_indel_length(std::string* paramValue){
+    min_indel_length = std::stoi(*paramValue);
+}
+void NGSParameters::set_max_indel_length(std::string* paramValue){
+    max_indel_length = std::stoi(*paramValue);
+}
 void NGSParameters::set_number_of_cells_to_mutate(std::string* paramValue){
     number_of_cells_to_mutate = std::stoi(*paramValue);
 }
@@ -670,13 +676,13 @@ int NGSParameters::get_min_long_deletion_length(){
     return(min_long_deletion_length);
 }
 int NGSParameters::get_min_balanced_inversion_length(){
-    return(min_balanced_inversion_length)
+    return(min_balanced_inversion_length);
 }
 int NGSParameters::get_min_balanced_translocation_length(){
-    return(min_balanced_translocation_length)
+    return(min_balanced_translocation_length);
 }
 int NGSParameters::get_min_indel_length(){
-    return(min_indel_length)
+    return(min_indel_length);
 }
 int NGSParameters::get_max_long_deletion_length(){
     return(max_long_deletion_length);
@@ -685,10 +691,10 @@ int NGSParameters::get_max_balanced_inversion_length(){
     return(max_balanced_inversion_length);
 }
 int NGSParameters::get_max_balanced_translocation_length(){
-    return(max_balanced_translocation_length)
+    return(max_balanced_translocation_length);
 }
 int NGSParameters::get_max_indel_length(){
-    return(max_indel_length)
+    return(max_indel_length);
 }
 int NGSParameters::get_number_of_cells_to_mutate(){
     return(number_of_cells_to_mutate);

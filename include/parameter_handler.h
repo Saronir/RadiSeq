@@ -63,7 +63,7 @@ class NGSParameters{
     double proportion_long_deletions;
     double proportion_balanced_inversions;
     double proportion_balanced_translocations;
-    double proportion_indels:
+    double proportion_indels;
     int min_long_deletion_length;
     int max_long_deletion_length;
     int min_balanced_inversion_length;
@@ -220,7 +220,7 @@ public:
     void set_proportion_balanced_inversions(std::string*);
     double get_proportion_balanced_inversions();
 
-    void set_proportion_balanced_translocations(std::string*)
+    void set_proportion_balanced_translocations(std::string*);
     double get_proportion_balanced_translocations();
 
     void set_proportion_indels(std::string*);

@@ -12,6 +12,7 @@
 #include <vector>
 #include <type_traits>
 #include <algorithm>
+#include <stdexcept>
 
 
 namespace rng{
@@ -115,7 +116,7 @@ namespace rng{
     }
     inline int int_sample(int lowerBound, int upperBound){ //thread safe integer sampler for mutagen -LL
         static thread_local std::mt19937 generator{std::random_device{}()};
-        std::uniform_int_distribution<int> dist(lowerBound, upperBound);
+        static thread_local std::uniform_int_distribution<int> dist(lowerBound, upperBound);
         return dist(generator);
     }
     inline double double_sample_0to1() {
