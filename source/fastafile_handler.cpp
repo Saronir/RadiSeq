@@ -10,6 +10,7 @@
 #include <omp.h>
 #include <stdexcept>
 #include <cmath>
+#include <algorithm>
 
 
 
@@ -956,223 +957,146 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
     int chromCount = 1;
     while (readFastaMemoryMap(genomeTemplate_data, templateSize, position, chromID_A, chromSeq_A, chromID_B, chromSeq_B)){// Get forward, backward sequences and their repective IDs for each chroms, one at a time
         long seq_length = chromSeq_A.size();
+        int i = chromCount - 1;
+        cdata_matrix[i].chromA_id = chromID_A;
+        cdata_matrix[i].chromB_id = chromID_B;
         //create mutated mirror of cell within cdata_matrix, then write it to file after the while loop is over
         //this way I don't have to make some unreadable logic to write out to file while still mutating the cell
-        int i = chromCount - 1;
+        long long start_make = 0;
+        for (long long k = 0; k < seq_length; k++) { 
+            long long idx = start_make + k;
+            if (idx < 0 || idx > seq_length) {
+                break;
+            }
+            cdata_matrix[i].chromA_seq += chromSeq_A[idx];
+        }
+        for (long long k = 0; k < seq_length; ++k) {
+            long long idx = start_make + k + 1;
+            if (idx < 0 || idx > seq_length) {
+                break;
+            }
+            cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //front fill rev-comp leading indel chromosome
+        }
+
         if (cdata_matrix[i].num_mutations == 0){//if current chromosome has no mutation
-            cdata_matrix[i].chromA_id = chromID_A;
-            cdata_matrix[i].chromB_id = chromID_B;
-            long long start = 0;
-            for (long long k = 0; k < seq_length; k++) { 
-                long long idx = start + k;
-                if (idx < 0 || idx > seq_length) {
-                    break;
-                }
-                cdata_matrix[i].chromA_seq += chromSeq_A[idx];
-            }
-            for (long long k = 0; k < seq_length; ++k) {
-                long long idx = start + k + 1;
-                if (idx < 0 || idx > seq_length) {
-                    break;
-                }
-                cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //front fill rev-comp leading indel chromosome
-            }
+            //do nothing lol
         }
         else{
-            for (int j = 0; j < cdata_matrix[i].mdata_matrix.size(); i++){
+            for (int j = 0; j < cdata_matrix[i].mdata_matrix.size(); j++){
                 std::cout << "check4" << std::endl;
                 if (cdata_matrix[i].mdata_matrix[j].mutation_type == "longdel"){
                     std::cout << "check5" << std::endl;
-                    cdata_matrix[i].chromA_id = chromID_A;
-                    cdata_matrix[i].chromB_id = chromID_B;
-                    int mutLocation = static_cast<int>(std::floor(cdata_matrix[i].mdata_matrix[j].normalized_position * seq_length));            // pick mutation loacation on sequence
+                    int mutLocation = static_cast<int>(std::floor(cdata_matrix[i].mdata_matrix[j].normalized_position * static_cast<double>(seq_length)));            // pick mutation loacation on sequence
                     cdata_matrix[i].mdata_matrix[j].position = mutLocation;
                     int length = cdata_matrix[i].mdata_matrix[j].length;
                     long long start = 0;
-                    for (long long k = 0; k < mutLocation; k++) { 
-                        long long idx = start + k;
-                        if (idx < 0 || idx > seq_length) {
-                            break;
-                        }
-                        cdata_matrix[i].chromA_seq += chromSeq_A[idx];
-                    }
-                    for (long long k = mutLocation + length; k < seq_length; k++) {
-                        long long idx = start + k;
-                        if (idx < 0 || idx > seq_length) {
-                            break;
-                        }
-                        cdata_matrix[i].chromA_seq += chromSeq_A[idx];
-                    }
-                    for (long long k = 0; k < mutLocation; ++k) {
-                        long long idx = start + k + 1;
-                        if (idx < 0 || idx > seq_length) {
-                            break;
-                        }
-                        cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //front fill rev-comp leading indel chromosome
-                    }
-                    for (long long k = mutLocation + length; k <= seq_length; ++k){
-                        long long idx = start + k + 1;
-                        if (idx < 0 || idx > seq_length) {
-                            break;
-                        }
-                        cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing indel chromosome
-                    }
+                    cdata_matrix[i].chromA_seq.erase(mutLocation, length);
+                    cdata_matrix[i].chromB_seq.erase(mutLocation, length);
+                    seq_length = seq_length - length;
                 }
                 else if (cdata_matrix[i].mdata_matrix[j].mutation_type == "balinv"){
                     std::cout << "check6" << std::endl;
-                    cdata_matrix[i].chromA_id = chromID_A;
-                    cdata_matrix[i].chromB_id = chromID_B;
-                    int mutLocation = static_cast<int>(std::floor(cdata_matrix[i].mdata_matrix[j].normalized_position * seq_length));            // pick mutation loacation on sequence
+                    int mutLocation = static_cast<int>(std::floor(cdata_matrix[i].mdata_matrix[j].normalized_position * static_cast<double>(seq_length)));            // pick mutation loacation on sequence
                     cdata_matrix[i].mdata_matrix[j].position = mutLocation;
                     int length = cdata_matrix[i].mdata_matrix[j].length;
                     long long start_mut = mutLocation;
                     long long start = 0;
-                    for (long long k = 0; k < mutLocation; k++) { 
-                        long long idx = start + k;
+                    for (int k = 0; k < length; k++) {
+                        int idx = start_mut + k;
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        cdata_matrix[i].chromA_seq += chromSeq_A[idx];
-                    }
-                    for (long long k = 0; k < mutLocation; ++k) {
-                        long long idx = start + k + 1;
-                        if (idx < 0 || idx > seq_length) {
-                            break;
+                        switch(cdata_matrix[i].chromA_seq[idx]){
+                            case 'A':                                               // Generate complementary base values accordingly
+                            cdata_matrix[i].chromA_seq[idx]='T'; break;
+                            case 'C':
+                            cdata_matrix[i].chromA_seq[idx]='G'; break;
+                            case 'G':
+                            cdata_matrix[i].chromA_seq[idx]='C'; break;
+                            case 'T':
+                            cdata_matrix[i].chromA_seq[idx]='A'; break;
+                            default:
+                            cdata_matrix[i].chromA_seq[idx]='N';
                         }
-                        cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //front fill rev-comp leading indel chromosome
                     }
                     for (int k = 0; k < length; k++) {
                         int idx = start_mut + k;
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        switch(chromSeq_A[idx]){
-                            case 'A':                                               // Generate complementary base values accordingly
-                            chromSeq_A[idx]='T'; break;
-                            case 'C':
-                            chromSeq_A[idx]='G'; break;
-                            case 'G':
-                            chromSeq_A[idx]='C'; break;
-                            case 'T':
-                            chromSeq_A[idx]='A'; break;
-                            default:
-                            chromSeq_A[idx]='N';
-                        }
-                        cdata_matrix[i].chromA_seq += chromSeq_A[idx]; 
-                    }
-                    for (int k = 0; k < length; ++k) {
-                        int idx = start_mut + k + 1;
-                        if (idx < 0 || idx > seq_length) {
-                            break;
-                        }
-                        switch(chromSeq_B[seq_length - idx]){
+                        switch(cdata_matrix[i].chromB_seq[idx]){
                             case 'A':                                            // Generate complementary base values accordingly
-                            chromSeq_B[seq_length - idx]='T'; break;
+                            cdata_matrix[i].chromB_seq[idx]='T'; break;
                             case 'C':
-                            chromSeq_B[seq_length - idx]='G'; break;
+                            cdata_matrix[i].chromB_seq[idx]='G'; break;
                             case 'G':
-                            chromSeq_B[seq_length - idx]='C'; break;
+                            cdata_matrix[i].chromB_seq[idx]='C'; break;
                             case 'T':
-                            chromSeq_B[seq_length - idx]='A'; break;
+                            cdata_matrix[i].chromB_seq[idx]='A'; break;
                             default:
-                            chromSeq_B[seq_length - idx]='N';
+                            cdata_matrix[i].chromB_seq[idx]='N';
                         }
-                        cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx]; 
-                    }
-                    for (long long k = mutLocation + length; k < seq_length; k++) {
-                        long long idx = start + k;
-                        if (idx < 0 || idx > seq_length) {
-                            break;
-                        }
-                        cdata_matrix[i].chromA_seq += chromSeq_A[idx];
-                    }
-                    for (long long k = mutLocation + length; k < seq_length; ++k){
-                        long long idx = start + k + 1;
-                        if (idx < 0 || idx > seq_length) {
-                            break;
-                        }
-                        cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing indel chromosome
                     }
                 }
                 else if (cdata_matrix[i].mdata_matrix[j].mutation_type == "baltrans"){
                     std::cout << "check7" << std::endl;
+                    std::string C1A = "";
+                    std::string C1B = "";
+                    std::string C2A = "";
+                    std::string C2B = "";
                     if (cdata_matrix[i].chromosome_number < cdata_matrix[i].mdata_matrix[j].pair){
-                        cdata_matrix[i].chromA_id = chromID_A;
-                        cdata_matrix[i].chromB_id = chromID_B;
                         int length = cdata_matrix[i].mdata_matrix[j].length;
                         int mutLocation = seq_length - length - 1;            // pick mutation loacation on sequence
                         cdata_matrix[i].mdata_matrix[j].position = mutLocation;
                         long long start_mut = mutLocation;
                         long long start = 0;
-                        for (long long k = 0; k < mutLocation; k++) { 
-                            long long idx = start + k;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[i].chromA_seq += chromSeq_A[idx];
-                        }
-                        for (long long k = 0; k < mutLocation; ++k) {
-                            long long idx = start + k + 1;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //front fill rev-comp leading translocated chromosome
-                        }
-                        for (long long k = mutLocation + length; k < seq_length; k++) {
-                            long long idx = start + k;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].chromA_seq += chromSeq_A[idx];
-                        }
-                        for (long long k = mutLocation + length; k < seq_length; ++k){
-                            long long idx = start + k + 1;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].chromB_seq += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing translocated chromosome
-                        }
-                    }
-                    else if (cdata_matrix[i].chromosome_number > cdata_matrix[i].mdata_matrix[j].pair){
-                        cdata_matrix[i].chromA_id = chromID_A;
-                        cdata_matrix[i].chromB_id = chromID_B;
-                        int length = cdata_matrix[i].mdata_matrix[j].length;
-                        int mutLocation = seq_length - length - 1;            // pick mutation loacation on sequence
-                        cdata_matrix[i].mdata_matrix[j].position = mutLocation;
-                        long long start_mut = mutLocation;
-                        long long start = 0;
-                        std::string chunkA = ""; //process leading chunk of chromosome to add it after for loop 
-                        std::string chunkB = "";
-                        for (long long k = 0; k < mutLocation; k++) { 
-                            long long idx = start + k;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            chunkA += chromSeq_A[idx];
-                        }
-                        cdata_matrix[i].chromA_seq = chunkA + cdata_matrix[i].chromA_seq;
-                        for (long long k = 0; k < mutLocation; ++k) {
-                            long long idx = start + k + 1;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            chunkB += chromSeq_B[seq_length - idx];   //front fill rev-comp leading translocated chromosome
-                        }
-                        cdata_matrix[i].chromB_seq = chunkB + cdata_matrix[i].chromB_seq;
                         for (long long k = mutLocation; k < seq_length; k++) {
                             long long idx = start + k;
                             if (idx < 0 || idx > seq_length) {
                                 break;
                             }
-                            cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].chromA_seq += chromSeq_A[idx];
+                            C1A += cdata_matrix[i].chromA_seq[idx];
                         }
-                        for (long long k = mutLocation; k < seq_length; ++k){
-                            long long idx = start + k + 1;
+                        for (long long k = mutLocation + length; k < seq_length; k++){
+                            long long idx = start + k;
                             if (idx < 0 || idx > seq_length) {
                                 break;
                             }
-                            cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].chromB_seq += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing translocated chromosome
+                            C1B += cdata_matrix[i].chromB_seq[idx];
                         }
+                        cdata_matrix[i].chromA_seq.erase(mutLocation, length);
+                        cdata_matrix[i].chromB_seq.erase(mutLocation, length);
+                        seq_length = seq_length - length + cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].mdata_matrix[j].length
+                    }
+                    else if (cdata_matrix[i].chromosome_number > cdata_matrix[i].mdata_matrix[j].pair){
+                        int length = cdata_matrix[i].mdata_matrix[j].length;
+                        int mutLocation = seq_length - length - 1;            // pick mutation loacation on sequence
+                        cdata_matrix[i].mdata_matrix[j].position = mutLocation;
+                        long long start_mut = mutLocation;
+                        long long start = 0;
+                        for (long long k = mutLocation; k < seq_length; k++) { 
+                            long long idx = start + k;
+                            if (idx < 0 || idx > seq_length) {
+                                break;
+                            }
+                            C2A += cdata_matrix[i].chromA_seq[idx];
+                        }
+                        for (long long k = 0; k < mutLocation; k++) {
+                            long long idx = start + k;
+                            if (idx < 0 || idx > seq_length) {
+                                break;
+                            }
+                            C2B += cdata_matrix[i].chromB_seq[idx];   //front fill rev-comp leading translocated chromosome
+                        }
+                        cdata_matrix[i].chromA_seq.erase(mutLocation, length);
+                        cdata_matrix[i].chromB_seq.erase(mutLocation, length);
+                        seq_length = seq_length - length + cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].mdata_matrix[j].length
+
+                        cdata_matrix[i].chromA_seq += C1A;
+                        cdata_matrix[i].chromB_seq += C1B;
+                        cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].chromA_seq += C2A;
+                        cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].chromA_seq += C2B;
+
                     }
                     else if (cdata_matrix[i].chromosome_number == cdata_matrix[i].mdata_matrix[j].pair){
                         cdata_matrix[i].mdata_matrix[j].mutation_type = "none";
@@ -1181,81 +1105,23 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                 else if (cdata_matrix[i].mdata_matrix[j].mutation_type == "indel"){
                     std::cout << "check8" << std::endl;
                     if (cdata_matrix[i].mdata_matrix[j].inordel == "del"){
-                        cdata_matrix[i].chromA_id = chromID_A;
-                        cdata_matrix[i].chromB_id = chromID_B;
-                        int mutLocation = static_cast<int>(std::floor(cdata_matrix[i].mdata_matrix[j].normalized_position * seq_length));            // pick mutation loacation on sequence
+                        int mutLocation = static_cast<int>(std::floor(cdata_matrix[i].mdata_matrix[j].normalized_position * static_cast<double>(seq_length)));            // pick mutation loacation on sequence
                         cdata_matrix[i].mdata_matrix[j].position = mutLocation;
                         int length = cdata_matrix[i].mdata_matrix[j].length;
                         long long start = 0;
-                        for (long long k = 0; k < mutLocation; k++) { 
-                            long long idx = start + k;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[i].chromA_seq += chromSeq_A[idx];
-                        }
-                        for (long long k = mutLocation + length; k < seq_length; k++) {
-                            long long idx = start + k;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[i].chromA_seq += chromSeq_A[idx];
-                        }
-                        for (long long k = 0; k < mutLocation; ++k) {
-                            long long idx = start + k + 1;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //front fill rev-comp leading indel chromosome
-                        }
-                        for (long long k = mutLocation + length; k <= seq_length; ++k){
-                            long long idx = start + k + 1;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing indel chromosome
-                        }
+                        cdata_matrix[i].chromA_seq.erase(mutLocation, length);
+                        cdata_matrix[i].chromB_seq.erase(mutLocation, length);
+                        seq_length = seq_length - length;
                     }
                     else if (cdata_matrix[i].mdata_matrix[j].inordel == "in"){
-                        cdata_matrix[i].chromA_id = chromID_A;
-                        cdata_matrix[i].chromB_id = chromID_B;
-                        int mutLocation = static_cast<int>(std::floor(cdata_matrix[i].mdata_matrix[j].normalized_position * seq_length));            // pick mutation loacation on sequence
+                        int mutLocation = static_cast<int>(std::floor(cdata_matrix[i].mdata_matrix[j].normalized_position * static_cast<double>(seq_length)));            // pick mutation loacation on sequence
                         cdata_matrix[i].mdata_matrix[j].position = mutLocation;
                         int length = cdata_matrix[i].mdata_matrix[j].length;
                         long long start = 0;
-                        long long start_mut = mutLocation;
                         const std::string random_insertion = generateDNA(length);
-                        const std::string random_insertion_rev_comp = reverseComplement(random_insertion);
-                        for (long long k = 0; k < mutLocation; k++) { 
-                            long long idx = start + k;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[i].chromA_seq += chromSeq_A[idx];
-                        }
-                        cdata_matrix[i].chromA_seq += random_insertion;
-                        for (long long k = mutLocation + length; k < seq_length; k++) {
-                            long long idx = start + k;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[i].chromA_seq += chromSeq_A[idx];
-                        }
-                        for (long long k = 0; k < mutLocation; ++k) {
-                            long long idx = start + k + 1;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //front fill rev-comp leading indel chromosome
-                        }
-                        cdata_matrix[i].chromB_seq += random_insertion_rev_comp;
-                        for (long long k = mutLocation + length; k <= seq_length; ++k){
-                            long long idx = start + k + 1;
-                            if (idx < 0 || idx > seq_length) {
-                                break;
-                            }
-                            cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //back fill rev-comp trailing indel chromosome
-                        }
+                        const std::string random_insertion_forward_comp = forwardComplement(random_insertion);
+                        cdata_matrix[i].chromA_seq.insert(mutLocation, random_insertion);
+                        cdata_matrix[i].chromB_seq.insert(mutLocation, random_insertion_forward_comp);
                     }
                 }
                 else if (cdata_matrix[i].mdata_matrix[j].mutation_type == "none"){
@@ -1266,7 +1132,6 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                 }
             }
         }
-        std::cout << "check end" << std::endl;
         chromCount++;
         seqStartIndex += seq_length;
     }
@@ -1284,6 +1149,9 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
             chrm_GC_bias.push_back(0.0);                                                                    // Corresponds to the chromosome ID
             chrm_GC_bias.push_back(GCBias::get_GCbias(chrm_GC_fraction));                                   // Stores the GC bias into a vector for each chromosome segment        
         }  
+
+        std::reverse(cdata_matrix[i].chromB_seq.begin(), cdata_matrix[i].chromB_seq.end());
+
         batch_buffer.push_back(cdata_matrix[i].chromB_id+"\n"+cdata_matrix[i].chromB_seq+"\n");
         chrm_seg_weights.push_back(0.0);                                                                    // Corresponds to the chromosome ID
         chrm_seg_weights.push_back(static_cast<double>(cdata_matrix[i].chromB_seq.size())/total_seq_length);            
@@ -1340,7 +1208,24 @@ std::string reverseComplement(const std::string& dna) { //generate rev-comp of a
             case 'T': result += 'A'; break;
             case 'C': result += 'G'; break;
             case 'G': result += 'C'; break;
-            default:  result += 'N'; // handle unexpected chars
+            default:  result += 'N'; 
+        }
+    }
+
+    return result;
+}
+
+std::string forwardComplement(const std::string& dna) { //generate rev-comp of a string
+    std::string result;
+    result.reserve(dna.size()); // avoid reallocations
+
+    for (char c : dna) {
+        switch (c) {
+            case 'A': result += 'T'; break;
+            case 'T': result += 'A'; break;
+            case 'C': result += 'G'; break;
+            case 'G': result += 'C'; break;
+            default:  result += 'N';
         }
     }
 

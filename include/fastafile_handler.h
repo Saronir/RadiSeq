@@ -13,6 +13,7 @@ std::vector<double> buildDamagedCellGenome_from_MM(NGSsdd&, const std::string&, 
 std::vector<double> buildMutatedCellGenome_from_MM(const std::string&, const std::string&, const std::string&, char*, size_t, long, NGSParameters&);
 std::string generateDNA(int);
 std::string reverseComplement(const std::string&);
+std::string forwardComplement(const std::string&);
 struct Mutation_Metadata{
     std::string mutation_type = "none"; //none, longdel, balinv, baltrans, indel
     double normalized_position = 0.0;
@@ -20,6 +21,7 @@ struct Mutation_Metadata{
     int length = 0; //length of mutation
     int pair = 0; //chromosome pair for translocations
     std::string inordel = "none"; //none, in, del
+    std::string base_pairs = "";
 };
 
 struct Chromosome_Metadata{
