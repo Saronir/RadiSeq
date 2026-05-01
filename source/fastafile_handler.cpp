@@ -977,7 +977,9 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
             }
             cdata_matrix[i].chromB_seq += chromSeq_B[seq_length - idx];   //front fill rev-comp leading indel chromosome
         }
-
+        // for (int f = 0; f < seq_length; f++){
+        //     std::cout << cdata_matrix[i].chromA_seq[f] << cdata_matrix[i].chromB_seq[f] << " ";
+        // }
         if (cdata_matrix[i].num_mutations == 0){//if current chromosome has no mutation
             //do nothing lol
         }
@@ -1018,6 +1020,7 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                             default:
                             cdata_matrix[i].chromA_seq[idx]='N';
                         }
+                        
                     }
                     for (int k = 0; k < length; k++) {
                         int idx = start_mut + k;
@@ -1066,7 +1069,7 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                         }
                         cdata_matrix[i].chromA_seq.erase(mutLocation, length);
                         cdata_matrix[i].chromB_seq.erase(mutLocation, length);
-                        seq_length = seq_length - length + cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].mdata_matrix[j].length
+                        seq_length = seq_length - length + cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].mdata_matrix[j].length;
                     }
                     else if (cdata_matrix[i].chromosome_number > cdata_matrix[i].mdata_matrix[j].pair){
                         int length = cdata_matrix[i].mdata_matrix[j].length;
@@ -1090,7 +1093,7 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                         }
                         cdata_matrix[i].chromA_seq.erase(mutLocation, length);
                         cdata_matrix[i].chromB_seq.erase(mutLocation, length);
-                        seq_length = seq_length - length + cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].mdata_matrix[j].length
+                        seq_length = seq_length - length + cdata_matrix[cdata_matrix[i].mdata_matrix[j].pair - 1].mdata_matrix[j].length;
 
                         cdata_matrix[i].chromA_seq += C1A;
                         cdata_matrix[i].chromB_seq += C1B;
