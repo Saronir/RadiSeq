@@ -929,27 +929,28 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
     for (int kk = 0; kk < mdat_matrix.size(); kk++){
         std::cout << mdat_matrix[kk].mutation_type << " " << mdat_matrix[kk].length << " " << mdat_matrix[kk].normalized_position << std::endl;
     }
-    std::cin.get();
-    int mut_used = 0;
+    //std::cin.get();
     int hold = 0;
     for (int i = 0; i < num_chrom; i++){
+        int mut_used = 0;
         if (cdata_matrix[i].num_mutations == 0){
             //nothing
-            std::cout << i+1 << std::endl;
+            //std::cout << i+1 << std::endl;
         }
         else{
             for (int j = 0; j < cdata_matrix[i].num_mutations; j++){
                 cdata_matrix[i].mdata_matrix.push_back(mdat_matrix[j + hold]);
+                //std::cout << i+1 << std::endl;
                 mut_used += 1;
             }
             hold += mut_used;
         }
     }
-    if (mut_used == total_mutations){
+    if (hold == total_mutations){
         //nothing
     }
     else{
-        std::cout << mut_used << " is not " << total_mutations << std::endl;
+        std::cout << hold << " is not " << total_mutations << std::endl;
         throw std::invalid_argument("Data skewed, mutations not used.");
         //throw exception here cause something wrong
     }
@@ -998,6 +999,8 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                 }
                 else if (cdata_matrix[i].mdata_matrix[j].mutation_type == "balinv"){
                     std::cout << "check6" << std::endl;
+                    std::string C1A = "";
+                    std::string C1B = "";
                     int mutLocation = static_cast<int>(std::floor(cdata_matrix[i].mdata_matrix[j].normalized_position * static_cast<double>(seq_length)));            // pick mutation loacation on sequence
                     cdata_matrix[i].mdata_matrix[j].position = mutLocation;
                     int length = cdata_matrix[i].mdata_matrix[j].length;
@@ -1008,37 +1011,30 @@ std::vector<double> buildMutatedCellGenome_from_MM(const std::string& outputPath
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        switch(cdata_matrix[i].chromA_seq[idx]){
-                            case 'A':                                               // Generate complementary base values accordingly
-                            cdata_matrix[i].chromA_seq[idx]='T'; break;
-                            case 'C':
-                            cdata_matrix[i].chromA_seq[idx]='G'; break;
-                            case 'G':
-                            cdata_matrix[i].chromA_seq[idx]='C'; break;
-                            case 'T':
-                            cdata_matrix[i].chromA_seq[idx]='A'; break;
-                            default:
-                            cdata_matrix[i].chromA_seq[idx]='N';
-                        }
-                        
+                        C1A += cdata_matrix[i].chromA_seq[idx];
                     }
                     for (int k = 0; k < length; k++) {
                         int idx = start_mut + k;
                         if (idx < 0 || idx > seq_length) {
                             break;
                         }
-                        switch(cdata_matrix[i].chromB_seq[idx]){
-                            case 'A':                                            // Generate complementary base values accordingly
-                            cdata_matrix[i].chromB_seq[idx]='T'; break;
-                            case 'C':
-                            cdata_matrix[i].chromB_seq[idx]='G'; break;
-                            case 'G':
-                            cdata_matrix[i].chromB_seq[idx]='C'; break;
-                            case 'T':
-                            cdata_matrix[i].chromB_seq[idx]='A'; break;
-                            default:
-                            cdata_matrix[i].chromB_seq[idx]='N';
+                        C1B += cdata_matrix[i].chromB_seq[idx];
+                    }
+                    reverse(C1A.begin(), C1A.end());
+                    reverse(C1B.begin(), C1B.end());
+                    for (int k = 0; k < length; k++) {
+                        int idx = start_mut + k;
+                        if (idx < 0 || idx > seq_length) {
+                            break;
                         }
+                        cdata_matrix[i].chromA_seq[idx] = C1B[k];
+                    }
+                    for (int k = 0; k < length; k++) {
+                        int idx = start_mut + k;
+                        if (idx < 0 || idx > seq_length) {
+                            break;
+                        }
+                        cdata_matrix[i].chromB_seq[idx] = C1A[k];
                     }
                 }
                 else if (cdata_matrix[i].mdata_matrix[j].mutation_type == "baltrans"){
