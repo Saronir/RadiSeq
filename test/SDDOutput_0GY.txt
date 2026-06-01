@@ -11,7 +11,7 @@ Particle fraction, 1.0;
 Dose or fluence,  0.0;
 Irradiation target, Full human cubic shape nuclear DNA model containing ~6.3 Gbp constructed using voxels;
 Volumes, 1,7.816,7.816,7.816,0,0,0,1,3.901,3.901,3.901,0,0,0;
-Chromosome sizes, 50, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02;
+Chromosome sizes, 1, 1;
 DNA Density, 13.3;
 Cell Cycle Phase, 0,1;
 DNA Structure, 0,1;

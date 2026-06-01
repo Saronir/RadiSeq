@@ -74,6 +74,7 @@ class NGSParameters{
     int max_indel_length;
     int number_of_cells_to_mutate;
     int number_chromo;
+    std::string input_mutations_path;
 
 public:
     NGSParameters();                                                             // Default constructor
@@ -115,6 +116,9 @@ public:
 
     //void set_dsb_threshold(std::string*);                                        // function to set the DSB threshold value
     //int get_dsb_threshold();                                                     // function to get the DSB threshold values
+
+    void set_input_mutations_path(std::string*);
+    const std::string* get_input_mutations_path(); 
 
     void set_sequencer(std::string*);                                            // function to set the name of the illumina sequencer
     const std::string* get_sequencer();                                          // function to get the sequencer name

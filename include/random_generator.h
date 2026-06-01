@@ -116,7 +116,7 @@ namespace rng{
     }
     inline int int_sample(int lowerBound, int upperBound){ //thread safe integer sampler for mutagen -LL
         static thread_local std::mt19937 generator{std::random_device{}()};
-        static thread_local std::uniform_int_distribution<int> dist(lowerBound, upperBound);
+        std::uniform_int_distribution<int> dist(lowerBound, upperBound);
         return dist(generator);
     }
     inline double double_sample_0to1() {
@@ -167,6 +167,26 @@ namespace rng{
     inline void shuffleVector(std::vector<T>& v) {
         static std::mt19937 gen(std::random_device{}());
         std::shuffle(v.begin(), v.end(), gen);
+    }
+    inline std::string random_id(std::size_t length = 6)
+    {
+        static constexpr char charset[] =
+            "0123456789"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz";
+
+        static thread_local std::mt19937 rng{std::random_device{}()};
+        static std::uniform_int_distribution<std::size_t> dist(0, sizeof(charset) - 2);
+
+        std::string result;
+        result.reserve(length);
+
+        for (std::size_t i = 0; i < length; ++i)
+        {
+            result += charset[dist(rng)];
+        }
+
+        return result;
     }
     
 

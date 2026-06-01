@@ -227,6 +227,9 @@ void NGSParameters::set_parameters(std::string* paramName, std::string* paramVal
     else if (*paramName == "number_chromo"){
         set_number_chromo(paramValue);
     }
+    else if (*paramName == "input_mutations_path"){
+        set_input_mutations_path(paramValue);
+    }
     else{
         std::cerr<<"\n WARNING: Unrecognized parameter specified : \""<<*paramName<<"\"\n"
         <<" ----- This parameter will be ignored -----\n";
@@ -294,6 +297,9 @@ void NGSParameters::set_max_acceptable_seq_length_difference(std::string* paramV
 void NGSParameters::set_output_directory(std::string* paramValue){
     output_directory = *paramValue;
 }
+void NGSParameters::set_input_mutations_path(std::string* paramValue){
+    input_mutations_path = *paramValue;
+} 
 //void NGSParameters::set_dsb_threshold(std::string* paramValue){
 //    dsb_threshold = std::stoi(*paramValue);
 //}
@@ -560,6 +566,9 @@ double NGSParameters::get_max_acceptable_seq_length_difference(){
 }
 const std::string* NGSParameters::get_output_directory(){
     return(&output_directory);
+}
+const std::string* NGSParameters::get_input_mutations_path(){
+    return(&input_mutations_path);
 }
 //int NGSParameters::get_dsb_threshold(){
 //    return(dsb_threshold);
