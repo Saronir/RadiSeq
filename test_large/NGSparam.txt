@@ -1,5 +1,3 @@
-#------------- DO NOT MODIFY THIS FILE  -------------#
-
 
 merge_damages_from_multiple_particles       = False                   # "True" if the user wishes to define a single genome by combiining damages
                                                                       #  from multiple SDD files corresponding to different primary simulations
@@ -9,7 +7,7 @@ number_of_particles_to_merge                = 1                       # Number o
 primary_particles_simulated                 = Unspecified             # Comma seperated list of names of primary particle (strings) that introduced 
                                                                       # the damages that are going to be combined into a single genome
 
-sddFilePath                                 = ./SDDOutput_0GY.txt                   # Path to the SDD file(s). Provide individual paths if more than 1 SDD
+sddFilePath                                 = ./SDDOutput_0GY.txt                      # Path to the SDD file(s). Provide individual paths if more than 1 SDD
 
 adjust_damages_with_actual_dose             = False                   # "True" if the user wishes to scale the number of damages with the actual dose
                                                                       # delivered and it is different from expected dose
@@ -20,9 +18,9 @@ actual_dose_delivered_data                  = ./actualDose.txt                  
 random_seed                                 = 0                       # Specify the seed number if the RNG needs to be initialized with a fixed seed
                                                                       # If 0, system will automatically generate random seeds completely random
 
-number_of_threads                           = 4                       # Specify the number of  threads you want to use to run the program. Default is 1
+number_of_threads                           = 8                       # Specify the number of  threads you want to use to run the program. Default is 1
 
-reference_genome_FASTAfile                  = ./synthetic_genome.fa                 # Path to the reference genome file. Default path is hard-coded, but user can change.
+reference_genome_FASTAfile                  = ./radiseq_humanlike_reference.fa                 # Path to the reference genome file. Default path is hard-coded, but user can change.
 
 acceptable_difference_in_seq_length_percent = 10                      # Specify what is the maximum acceptable difference in the lengths of the reference genome provided 
                                                                       # and the genome length of the Monte Carlo model in percentage. 
@@ -32,7 +30,7 @@ output_directory_path                       = ./output                # Path to 
 #DSB_threshold_in_bp                         = 10                      # Maximum distance between two opposite strand break to be considered as part of a 
                                                                       # double-strand break (DSB). Specify the distance in bp
 
-illumina_sequencer                          = NovaSeq6000                  # Name of the Illumina sequencer to be used for sequencing. Only the following names
+illumina_sequencer                          = HiSeqX                  # Name of the Illumina sequencer to be used for sequencing. Only the following names
                                                                       # can be used: HiSeq1000, HiSeq2000, HiSeq2500_v125, HiSeq2500_v150, HiSeqX and NovaSeq6000
 
 custom_read1_quality_profile_path           = ""                      # Must specify the path to the quality profile file for read 1 if custom sequencer is chosen
@@ -94,3 +92,47 @@ read2_deletion_error_rate                   = 0.00023                 # Specify 
 output_FASTQ_filename_prefix                = CELL                    # Prefix for the sequenced output FASTQ file (omit file extension)
 
 make_summary_report                         = True                    # "True" if user wishes to generate a summary report file at the end of run
+
+#begin Lexa's additions for inserting mutations into cells directly
+
+input_mutations_path                       = ./mutations.json                # Path to the optional mutation file
+
+structural_variation_frequency              = 10                    # Positive double representing the frequency of structural variations. Set to 0 to disable the feature by default.
+
+number_of_cells_to_mutate                   = 5                      # Specify number of cells in sample to mutate.
+
+number_chromo				     = 46			# Default number of chromosomes per cell.
+
+proportion_balanced_inversions              = 0.475                    #0.50 Fraction of mutations that are balanced inversions. Expects a double between 0 and 1.
+
+min_balanced_inversion_length		     = 50		      # Minimum number of base pairs a balanced inversion can be.
+
+max_balanced_inversion_length               = 10000		      # Maximum number of base pairs a balanced inversion can be.
+
+proportion_balanced_translocations          = 0.254                    #0.20 Fraction of mutations that are balanced translocations. Expects a double between 0 and 1.
+
+#min_balanced_translocation_length_a         = 5000                  # Minimum length from end of chromosome 'a' that a balanced translocation can be.
+
+#min_balanced_translocation_length_b         = 5000                  # Minimum length from end of chromosome 'b' that a balanced translocation can be.
+
+#max_balanced_translocation_length_a         = 1000000                  # Minimum length from end of chromosome 'a' that a balanced translocation can be.
+
+#max_balanced_translocation_length_b         = 1000000                  # Minimum length from end of chromosome 'b' that a balanced translocation can be.
+
+#translocation_pairing_distribution_path     = ""                       # Default path for translocation pairing function.
+
+min_balanced_translocation_length	     = 5000                    # Minimum length a balanced translocation can be
+
+max_balanced_translocation_length	     = 100000                    # Maximum length a balanced translocation can be 
+
+proportion_long_deletions                   = 0.169                    #0.2 Fraction of mutations that are long deletions. Expects a double between 0 and 1.
+
+min_long_deletion_length                    = 1000                      # Minimum length of a long deletion. Integer number of base pairs. 50 or 1000?
+
+max_long_deletion_length                    = 10000                   # Maximum length of a long deletion. Integer number of base pairs.
+
+proportion_indels                           = 0.102                    #0.1 Fraction of mutations that are insertion-deletions. Expects a double between 0 and 1.
+
+min_indel_length                            = 1                       # Minimum length of an indel. Integer number of base pairs.
+
+max_indel_length                            = 49                      # Maximum length of an indel. Integer number of base pairs.

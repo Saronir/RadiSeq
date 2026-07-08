@@ -1,227 +1,266 @@
-#include "fileio.h"
-#include "support_functions.h"
-#include "random_generator.h"
 #include "mutationfile_handler.h"
-#include "json.hpp"
 
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <sys/mman.h>
-#include <omp.h>
-#include <stdexcept>
+#include "random_generator.h"
+
 #include <cmath>
-#include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
 
-//READS JSON FILE CONTAINING CHROMOSOME DATA FOR EXACT LOCATIONS OF MUTATIONS FOLLOWING THE STRUCTURE USED 
-//IN THE CDATA_MATRIX AND MDATA_MATRIX OBJECTS
+namespace {
 
-//-LL
+void validate_proportion(double value, const std::string& name) {
+    if (!std::isfinite(value) || value < 0.0 || value > 1.0) {
+        throw std::invalid_argument(name + " must be between 0 and 1.");
+    }
+}
 
-// using json = nlohmann::json;
+void validate_length_range(int minimum, int maximum, const std::string& name) {
+    if (minimum <= 0 || maximum < minimum) {
+        throw std::invalid_argument(
+            name + " requires 0 < minimum <= maximum."
+        );
+    }
+}
 
-//FUNCTION TO CHECK FOR MUTATION FILE IN WORKING DIRECTORY
+void add_mutation(
+    std::vector<Chromosome_Metadata>& chromosomes,
+    int chromosome_number,
+    Mutation_Metadata mutation)
+{
+    if (chromosome_number < 1 ||
+        chromosome_number > static_cast<int>(chromosomes.size()))
+    {
+        throw std::out_of_range("Mutation chromosome number is out of range.");
+    }
+
+    auto& chromosome = chromosomes.at(
+        static_cast<std::size_t>(chromosome_number - 1)
+    );
+
+    chromosome.mdata_matrix.push_back(std::move(mutation));
+    chromosome.num_mutations = static_cast<int>(chromosome.mdata_matrix.size());
+}
+
+} // namespace
+
 bool check_mutation_file(const std::string& filename) {
-    return std::filesystem::exists(filename);
+    return !filename.empty() &&
+           std::filesystem::is_regular_file(std::filesystem::path(filename));
 }
 
-//FUNCTION TO GENERATE MUTATIONS GIVEN MUTATIONAL PARAMETERS
-std::vector<Chromosome_Metadata> mutation_generator(NGSParameters& parameters){
+std::vector<Chromosome_Metadata> mutation_generator(NGSParameters& parameters) {
+    const int num_chrom = parameters.get_number_chromo();
+    const double mutation_frequency =
+        parameters.get_structural_variation_frequency();
 
-    int num_chrom = parameters.get_number_chromo();
-    double SVfreq = parameters.get_structural_variation_frequency();
-    double mean_num_long_del = parameters.get_proportion_long_deletions() * SVfreq;         //mean number of long deletions
-    double mean_num_bal_inv = parameters.get_proportion_balanced_inversions() * SVfreq;
-    double mean_num_bal_trans = parameters.get_proportion_balanced_translocations() * SVfreq;
-    double mean_num_indel = parameters.get_proportion_indels() * SVfreq;
-    int num_long_del = rng::poisson_sample(mean_num_long_del);                              //number of long deletions in the cell
-    int num_bal_inv = rng::poisson_sample(mean_num_bal_inv);
-    int num_bal_trans = rng::poisson_sample(mean_num_bal_trans);
-    int num_indel = rng::poisson_sample(mean_num_indel);
+    if (num_chrom <= 0) {
+        throw std::invalid_argument("number_chromo must be positive.");
+    }
+    if (!std::isfinite(mutation_frequency) || mutation_frequency < 0.0) {
+        throw std::invalid_argument(
+            "structural_variation_frequency must be finite and non-negative."
+        );
+    }
 
-    //sum the mutations and then distribute them to unique chromosomes, making sure you don't run out of chromosomes
-    //some loss of generality in doing this, but otherwise there are troubling end cases and logical sorting to deal with
-    int total_mutations = num_long_del + num_bal_inv + (2.0 * num_bal_trans) + num_indel;
-    std::vector<int> mutated_chromosomes = rng::non_unique_random(1, num_chrom, total_mutations);
+    const double proportion_long_deletions =
+        parameters.get_proportion_long_deletions();
+    const double proportion_balanced_inversions =
+        parameters.get_proportion_balanced_inversions();
+    const double proportion_balanced_translocations =
+        parameters.get_proportion_balanced_translocations();
+    const double proportion_indels = parameters.get_proportion_indels();
 
-    // for (int kk = 0; kk < mutated_chromosomes.size(); kk++){
-    //     std::cout << mutated_chromosomes[kk] << std::endl;
-    // }
+    validate_proportion(proportion_long_deletions,
+                        "proportion_long_deletions");
+    validate_proportion(proportion_balanced_inversions,
+                        "proportion_balanced_inversions");
+    validate_proportion(proportion_balanced_translocations,
+                        "proportion_balanced_translocations");
+    validate_proportion(proportion_indels, "proportion_indels");
 
-    //construct chromosome data mutation matrix from params 
-    /*
-        chromosome_number | mutation_metadata 
-    
-    */
-    std::vector<Chromosome_Metadata> cdata_matrix; 
-    std::vector<Mutation_Metadata> mdat_matrix;
+    const double proportion_sum =
+        proportion_long_deletions +
+        proportion_balanced_inversions +
+        proportion_balanced_translocations +
+        proportion_indels;
 
-    for (int i = 0; i < num_chrom; i++){
-        int counter = 0;
-        for (int j = 0; j < total_mutations; j++){
-            if (mutated_chromosomes[j] == i + 1){
-                counter += 1;
-            }
+    if (proportion_sum > 1.0 + 1.0e-12) {
+        throw std::invalid_argument(
+            "The mutation-type proportions must sum to no more than 1."
+        );
+    }
+
+    const int length_LD_min = parameters.get_min_long_deletion_length();
+    const int length_LD_max = parameters.get_max_long_deletion_length();
+    const int length_BI_min = parameters.get_min_balanced_inversion_length();
+    const int length_BI_max = parameters.get_max_balanced_inversion_length();
+    const int length_BT_min = parameters.get_min_balanced_translocation_length();
+    const int length_BT_max = parameters.get_max_balanced_translocation_length();
+    const int length_ID_min = parameters.get_min_indel_length();
+    const int length_ID_max = parameters.get_max_indel_length();
+
+    const int num_long_del = rng::poisson_sample(
+        proportion_long_deletions * mutation_frequency
+    );
+    const int num_bal_inv = rng::poisson_sample(
+        proportion_balanced_inversions * mutation_frequency
+    );
+    const int num_bal_trans = rng::poisson_sample(
+        proportion_balanced_translocations * mutation_frequency
+    );
+    const int num_indel = rng::poisson_sample(
+        proportion_indels * mutation_frequency
+    );
+
+    if (num_long_del > 0) {
+        validate_length_range(
+            length_LD_min, length_LD_max, "long deletion length"
+        );
+    }
+    if (num_bal_inv > 0) {
+        validate_length_range(
+            length_BI_min, length_BI_max, "inversion length"
+        );
+    }
+    if (num_bal_trans > 0) {
+        validate_length_range(
+            length_BT_min, length_BT_max, "translocation length"
+        );
+    }
+    if (num_indel > 0) {
+        validate_length_range(
+            length_ID_min, length_ID_max, "indel length"
+        );
+    }
+
+    if (num_bal_trans > 0 && num_chrom < 2) {
+        throw std::invalid_argument(
+            "At least two chromosomes are required for a translocation."
+        );
+    }
+
+    std::vector<Chromosome_Metadata> chromosomes(
+        static_cast<std::size_t>(num_chrom)
+    );
+
+    for (int i = 0; i < num_chrom; ++i) {
+        chromosomes[static_cast<std::size_t>(i)].chromosome_number = i + 1;
+    }
+
+    for (int i = 0; i < num_long_del; ++i) {
+        Mutation_Metadata mutation;
+        mutation.mutation_type = "longdel";
+        mutation.length = rng::int_sample(length_LD_min, length_LD_max);
+        mutation.normalized_position = rng::double_sample_0to1();
+
+        add_mutation(
+            chromosomes,
+            rng::int_sample(1, num_chrom),
+            std::move(mutation)
+        );
+    }
+
+    for (int i = 0; i < num_bal_inv; ++i) {
+        Mutation_Metadata mutation;
+        mutation.mutation_type = "balinv";
+        mutation.length = rng::int_sample(length_BI_min, length_BI_max);
+        mutation.normalized_position = rng::double_sample_0to1();
+
+        add_mutation(
+            chromosomes,
+            rng::int_sample(1, num_chrom),
+            std::move(mutation)
+        );
+    }
+
+    std::uint64_t next_event_id = 1;
+
+    for (int i = 0; i < num_bal_trans; ++i) {
+        const int chromosome_a = rng::int_sample(1, num_chrom);
+
+        int chromosome_b = chromosome_a;
+        while (chromosome_b == chromosome_a) {
+            chromosome_b = rng::int_sample(1, num_chrom);
         }
-        Chromosome_Metadata chrom;
-        chrom.chromosome_number = i + 1;
-        chrom.num_mutations = counter;
-        cdata_matrix.push_back(chrom);
+
+        const std::uint64_t event_id = next_event_id++;
+
+        Mutation_Metadata mutation_a;
+        mutation_a.mutation_type = "baltrans";
+        mutation_a.length = rng::int_sample(length_BT_min, length_BT_max);
+        mutation_a.pair = chromosome_b;
+        mutation_a.event_id = event_id;
+
+        Mutation_Metadata mutation_b;
+        mutation_b.mutation_type = "baltrans";
+        mutation_b.length = rng::int_sample(length_BT_min, length_BT_max);
+        mutation_b.pair = chromosome_a;
+        mutation_b.event_id = event_id;
+
+        add_mutation(chromosomes, chromosome_a, std::move(mutation_a));
+        add_mutation(chromosomes, chromosome_b, std::move(mutation_b));
     }
 
-    //std::cout << "check2" << std::endl;
-    // std::cin.get();
+    for (int i = 0; i < num_indel; ++i) {
+        Mutation_Metadata mutation;
+        mutation.mutation_type = "indel";
+        mutation.length = rng::int_sample(length_ID_min, length_ID_max);
+        mutation.normalized_position = rng::double_sample_0to1();
+        mutation.inordel = rng::int_sample(0, 1) == 0 ? "in" : "del";
 
-    //Populate mutation matrix with all required params besides location 
-    int length_LD_min = parameters.get_min_long_deletion_length();          //fetch min length of long deletion
-    int length_LD_max = parameters.get_max_long_deletion_length();          //fetch max length of long deletion
-    for (int i = 0; i < num_long_del; i++){
-        Mutation_Metadata mut;
-        mut.mutation_type = "longdel";
-        mut.length = rng::int_sample(length_LD_min, length_LD_max);     //pick a random length for each long deletion
-        mut.normalized_position = rng::double_sample_0to1();
-        // Chromosome_Metadata chrom;
-        // chrom.chromosome_number = mutated_chromosomes[i];
-        // chrom.mutation_metadata = mut;
-        // cdata_matrix.push_back(chrom);
-        mdat_matrix.push_back(mut);
-    }
-    //std::cout << "check2a" << std::endl;
-    int length_BI_min = parameters.get_min_balanced_inversion_length();
-    int length_BI_max = parameters.get_max_balanced_inversion_length();
-    for (int i = 0; i < num_bal_inv; i++){
-        Mutation_Metadata mut;
-        mut.mutation_type = "balinv";
-        mut.length = rng::int_sample(length_BI_min, length_BI_max);
-        mut.normalized_position = rng::double_sample_0to1();
-        // Chromosome_Metadata chrom;
-        // chrom.chromosome_number = mutated_chromosomes[i + num_long_del];
-        // chrom.mutation_metadata = mut;
-        // cdata_matrix.push_back(chrom);
-        mdat_matrix.push_back(mut);
-    }
-    //std::cout << "check2b" << std::endl;
-    int length_BT_min = parameters.get_min_balanced_translocation_length();
-    int length_BT_max = parameters.get_max_balanced_translocation_length();
-    for (int i = 0; i < num_bal_trans; i++){
-        Mutation_Metadata mut;
-        mut.mutation_type = "baltrans";
-        mut.length = rng::int_sample(length_BT_min, length_BT_max);
-        //Chromosome_Metadata chrom;
-        //chrom.chromosome_number = mutated_chromosomes[i + num_long_del + num_bal_inv];
-        mut.pair = mutated_chromosomes[i + num_long_del + num_bal_inv + num_bal_trans];
-        //chrom.mutation_metadata = mut;
-        //cdata_matrix.push_back(chrom);
-        mdat_matrix.push_back(mut);
-
-        Mutation_Metadata mut_pair;
-        mut_pair.mutation_type = "baltrans";
-        mut_pair.length = rng::int_sample(length_BI_min, length_BI_max);
-        //Chromosome_Metadata chrom_pair;
-        //chrom_pair.chromosome_number = mut.pair;
-        mut_pair.pair = mutated_chromosomes[i + num_long_del + num_bal_inv];
-        //hrom_pair.mutation_metadata = mut_pair;
-        //cdata_matrix.push_back(chrom_pair);
-        mdat_matrix.push_back(mut_pair);
-    }
-    //std::cout << "check2c" << std::endl;
-    int length_ID_min = parameters.get_min_indel_length();
-    int length_ID_max = parameters.get_max_indel_length();
-    for (int i = 0; i < num_indel; i++){
-        Mutation_Metadata mut;
-        mut.mutation_type = "indel";
-        mut.length = rng::int_sample(500, 2000);
-        mut.normalized_position = rng::double_sample_0to1();
-        int coinFlip = rng::int_sample(0,1);
-        std::cout << coinFlip << std::endl;
-        if (coinFlip == 0){
-            mut.inordel = "in";
-        }
-        else if (coinFlip == 1){
-            mut.inordel = "del";
-        }
-        else{
-            //throw some exception here
-        }
-        //Chromosome_Metadata chrom;
-        //chrom.chromosome_number = mutated_chromosomes[i + num_long_del + num_bal_inv + 2 * num_bal_trans];
-        //chrom.mutation_metadata = mut;
-        //cdata_matrix.push_back(chrom);
-        mdat_matrix.push_back(mut);
-    }
-    //std::cout << "check2d" << std::endl;
-    //shuffle up the mutation metadata matrix
-    rng::shuffleVector(mdat_matrix);
-
-    //put the mutations into the mutated chromosomes
-    for (int kk = 0; kk < mdat_matrix.size(); kk++){
-        std::cout << mdat_matrix[kk].mutation_type << " " << mdat_matrix[kk].inordel  << " " << mdat_matrix[kk].length << " " << mdat_matrix[kk].normalized_position << std::endl;
-    }
-    //std::cin.get();
-    int hold = 0;
-    for (int i = 0; i < num_chrom; i++){
-        int mut_used = 0;
-        if (cdata_matrix[i].num_mutations == 0){
-            //nothing
-            //std::cout << i+1 << std::endl;
-        }
-        else{
-            for (int j = 0; j < cdata_matrix[i].num_mutations; j++){
-                cdata_matrix[i].mdata_matrix.push_back(mdat_matrix[j + hold]);
-                //std::cout << i+1 << std::endl;
-                mut_used += 1;
-            }
-            hold += mut_used;
-        }
-    }
-    if (hold == total_mutations){
-        //nothing
-    }
-    else{
-        std::cout << hold << " is not " << total_mutations << std::endl;
-        throw std::invalid_argument("Data skewed, mutations not used.");
-        //throw exception here cause something wrong
+        add_mutation(
+            chromosomes,
+            rng::int_sample(1, num_chrom),
+            std::move(mutation)
+        );
     }
 
-    return cdata_matrix;
-
+    return chromosomes;
 }
 
-//FUCTION TO INPUT AND CREATE CDATA_MATRIX FROM INPUT FILE
-Cell_Metadata input_mutation_file(const std::string& filepath){
+Cell_Metadata input_mutation_file(const std::string& filepath) {
     std::ifstream file(filepath);
+    if (!file) {
+        throw std::runtime_error("Could not open mutation file: " + filepath);
+    }
 
     json j;
     file >> j;
-
-    Cell_Metadata cell = j.get<Cell_Metadata>();
-
-    return cell;
+    return j.get<Cell_Metadata>();
 }
 
-//FUNCTION TO OUTPUT MUTATION FILE FROM CDATA_MATRIX
-void output_mutation_file(Cell_Metadata& cell, const std::string& outfilepath){
-    json j = cell;
-
+void output_mutation_file(
+    Cell_Metadata& cell,
+    const std::string& outfilepath)
+{
     std::ofstream file(outfilepath);
-    file << j.dump(4);
+    if (!file) {
+        throw std::runtime_error(
+            "Could not open mutation output file: " + outfilepath
+        );
+    }
+
+    const json j = cell;
+    file << j.dump(4) << '\n';
 }
 
-//USING ARGUMENT DEPENDANT LOOKUP FOR THE JSON I/O
-void to_json(json& j, const Mutation_Metadata& data){
+void to_json(json& j, const Mutation_Metadata& data) {
     j = json{
         {"mutation type", data.mutation_type},
         {"normalized position", data.normalized_position},
         {"position", data.position},
         {"length", data.length},
         {"pair", data.pair},
+        {"event id", data.event_id},
         {"insertion or deletion", data.inordel},
         {"base pairs", data.base_pairs}
     };
 }
 
-void to_json(json& j, const Chromosome_Metadata& data){
+void to_json(json& j, const Chromosome_Metadata& data) {
     j = json{
         {"chromosome number", data.chromosome_number},
         {"number of mutations", data.num_mutations},
@@ -233,34 +272,35 @@ void to_json(json& j, const Chromosome_Metadata& data){
     };
 }
 
-void to_json(json& j, const Cell_Metadata& data){
+void to_json(json& j, const Cell_Metadata& data) {
     j = json{
         {"cell id", data.cell_id},
         {"chromosome metadata", data.cdata_matrix}
     };
 }
 
-void from_json(const json& j, Mutation_Metadata& data){
+void from_json(const json& j, Mutation_Metadata& data) {
     j.at("mutation type").get_to(data.mutation_type);
-    j.at("normalized position").get_to(data.normalized_position);
-    j.at("position").get_to(data.position);
+    data.normalized_position = j.value("normalized position", 0.0);
+    data.position = j.value("position", 0);
     j.at("length").get_to(data.length);
-    j.at("pair").get_to(data.pair);
-    j.at("insertion or deletion").get_to(data.inordel);
-    j.at("base pairs").get_to(data.base_pairs);
+    data.pair = j.value("pair", 0);
+    data.event_id = j.value("event id", std::uint64_t{0});
+    data.inordel = j.value("insertion or deletion", std::string{"none"});
+    data.base_pairs = j.value("base pairs", std::string{});
 }
 
-void from_json(const json& j, Chromosome_Metadata& data){
+void from_json(const json& j, Chromosome_Metadata& data) {
     j.at("chromosome number").get_to(data.chromosome_number);
-    j.at("number of mutations").get_to(data.num_mutations);
-    j.at("chromosome A ID").get_to(data.chromA_id);
-    j.at("chromosome A sequence").get_to(data.chromA_seq);
-    j.at("chromosome B ID").get_to(data.chromB_id);
-    j.at("chromosome B sequence").get_to(data.chromB_seq);
+    data.chromA_id = j.value("chromosome A ID", std::string{});
+    data.chromA_seq = j.value("chromosome A sequence", std::string{});
+    data.chromB_id = j.value("chromosome B ID", std::string{});
+    data.chromB_seq = j.value("chromosome B sequence", std::string{});
     j.at("mutation metadata").get_to(data.mdata_matrix);
+    data.num_mutations = static_cast<int>(data.mdata_matrix.size());
 }
 
-void from_json(const json& j, Cell_Metadata& data){
-    j.at("cell id").get_to(data.cell_id);
+void from_json(const json& j, Cell_Metadata& data) {
+    data.cell_id = j.value("cell id", std::string{});
     j.at("chromosome metadata").get_to(data.cdata_matrix);
 }

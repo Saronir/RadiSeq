@@ -200,7 +200,7 @@ void NGSParameters::set_parameters(std::string* paramName, std::string* paramVal
     else if (*paramName == "min_long_deletion_length"){
         set_min_long_deletion_length(paramValue);
     }
-    else if (*paramName == "min_balanced_invertion_length"){
+    else if (*paramName == "min_balanced_inversion_length"){
         set_min_balanced_inversion_length(paramValue);
     }
     else if (*paramName == "min_balanced_translocation_length"){
@@ -212,7 +212,7 @@ void NGSParameters::set_parameters(std::string* paramName, std::string* paramVal
     else if (*paramName == "max_long_deletion_length"){
         set_max_long_deletion_length(paramValue);
     }
-    else if (*paramName == "max_balanced_invertion_length"){
+    else if (*paramName == "max_balanced_inversion_length"){
         set_max_balanced_inversion_length(paramValue);
     }
     else if (*paramName == "max_balanced_translocation_length"){

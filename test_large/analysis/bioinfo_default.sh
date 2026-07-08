@@ -9,4 +9,4 @@ samtools sort -o outsorted.bam ./outbam.bam
 
 samtools index ./outsorted.bam
 
-bcftools mpileup -Ou -f ../synthetic_genome.fa ./outsorted.bam --threads 1 | bcftools call -mv -Ov | bcftools norm -m -any | bcftools filter -e 'QUAL<5 || DP<5' > outfiltered.vcf
+bcftools mpileup -Ou -f ../radiseq_humanlike_reference.fa ./outsorted.bam --threads 1 | bcftools call -m -Ov | bcftools norm -m -any | bcftools filter -e 'QUAL<20 || DP<20' > outfiltered.vcf
