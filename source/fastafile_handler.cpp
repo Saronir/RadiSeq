@@ -1887,7 +1887,6 @@ std::vector<double> write_mutated_fasta_and_get_weights(
 
 } // namespace
 
-// Replace the existing buildMutatedCellGenome_from_MM() with this version.
 std::vector<double> buildMutatedCellGenome_from_MM(
     const std::string& outputPath,
     const std::string& fileName,
