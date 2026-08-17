@@ -59,17 +59,20 @@ class NGSParameters{
     double r2_delError_rate;                                                     // Deletion error rate in read 2 
     std::string fastq_filename_prefix;                                           // String to hold the user-specified fastq output filename prefix
     bool is_summary_report{false};                                               // True if user wishes to generate a summary report at the end of the run
-    double structural_variation_frequency;                                       // Frequency of mutations for inserting mutations directly into a genome
+    double structural_variation_frequency;                                       // Mean number of structural-variant events generated per mutated cell
+    double indel_frequency{0.0};                                                  // Independent mean number of short-indel events generated per mutated cell
     double proportion_long_deletions;
     double proportion_balanced_inversions;
     double proportion_balanced_translocations;
-    double proportion_indels;
+    double proportion_delins{0.0};                                               // Fraction of structural variants generated as deletion-insertion composites
     int min_long_deletion_length;
     int max_long_deletion_length;
     int min_balanced_inversion_length;
     int max_balanced_inversion_length;
     int min_balanced_translocation_length;
     int max_balanced_translocation_length;
+    int min_delins_length{100};
+    int max_delins_length{1000};
     int min_indel_length;
     int max_indel_length;
     int number_of_cells_to_mutate;
@@ -218,6 +221,9 @@ public:
     void set_structural_variation_frequency(std::string*, std::string*);
     double get_structural_variation_frequency();
 
+    void set_indel_frequency(std::string*, std::string*);
+    double get_indel_frequency();
+
     void set_proportion_long_deletions(std::string*);
     double get_proportion_long_deletions();
 
@@ -227,8 +233,8 @@ public:
     void set_proportion_balanced_translocations(std::string*);
     double get_proportion_balanced_translocations();
 
-    void set_proportion_indels(std::string*);
-    double get_proportion_indels();
+    void set_proportion_delins(std::string*);
+    double get_proportion_delins();
 
     void set_min_long_deletion_length(std::string*);
     int get_min_long_deletion_length();
@@ -238,6 +244,9 @@ public:
 
     void set_min_balanced_translocation_length(std::string*);
     int get_min_balanced_translocation_length();
+
+    void set_min_delins_length(std::string*);
+    int get_min_delins_length();
 
     void set_min_indel_length(std::string*);
     int get_min_indel_length();
@@ -250,6 +259,9 @@ public:
 
     void set_max_balanced_translocation_length(std::string*);
     int get_max_balanced_translocation_length();
+
+    void set_max_delins_length(std::string*);
+    int get_max_delins_length();
 
     void set_max_indel_length(std::string*);
     int get_max_indel_length();

@@ -879,7 +879,7 @@ bool ART::generate_paired_reads_with_indel(ART& read_1, ART& read_2, int minFrag
                     binStart = num_available_fullBins*GC_binSize; 
                 }
                 long binEnd = std::min(available_region, ((selected_bin+1)*GC_binSize));                // Ending position of the selected bin or the end of available region; whichever is the smallest
-                start_position_1  = rng::rand_int(binStart,binEnd);                                     // Find a position in this bin to generate the read randomly, since the bias in a bin is uniform
+                start_position_1  = rng::rand_int(binStart,binEnd,threadID);                                     // Find a position in this bin to generate the read randomly, since the bias in a bin is uniform
             }else{                                                                                      // If  the condition is not met for some reason, return false. 
                 return false;
             }

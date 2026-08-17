@@ -1,0 +1,14 @@
+name: radiseq-bioinfo
+
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+
+dependencies:
+  - bwa
+  - bowtie2
+  - samtools
+  - bcftools
+  - htslib
+  - delly

@@ -21,12 +21,12 @@ OBJ_DIR = objects
 # Determine the C++17 standard flag based on the compiler
 COMPILER := $(shell $(CPP) -dM -E - < /dev/null | grep __clang__)
 ifneq ($(COMPILER),)
-    CXXFLAGS = -c -Wall -O3 -g -std=c++1z -fopenmp -I$(INC_DIR)
+    CXXFLAGS = -c -Wall -O3 -g -std=c++1z -fopenmp -pthread -I$(INC_DIR)
 else
-    CXXFLAGS = -c -Wall -O3 -g -std=c++17 -fopenmp -I$(INC_DIR)
+    CXXFLAGS = -c -Wall -O3 -g -std=c++17 -fopenmp -pthread -I$(INC_DIR)
 endif
 
-LDFLAGS = -fopenmp -lz
+LDFLAGS = -fopenmp -pthread -lz
 # LDFLAGS are linker flags
 # -fopenmp link openmp library for parallelization
 # -lrt link against the real-time extensions library (sometimes needed when working with POSIX functions)

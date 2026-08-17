@@ -1154,6 +1154,7 @@ std::size_t resolve_insertion_position(
 bool is_local_mutation(const Mutation_Metadata& mutation) {
     return mutation.mutation_type == "longdel" ||
            mutation.mutation_type == "balinv" ||
+           mutation.mutation_type == "delins" ||
            mutation.mutation_type == "indel";
 }
 
@@ -1162,7 +1163,8 @@ ReservedInterval proposed_interval(
     std::size_t original_sequence_length,
     std::size_t& resolved_position)
 {
-    if (mutation.mutation_type == "indel" &&
+    if ((mutation.mutation_type == "indel" ||
+         mutation.mutation_type == "delins") &&
         mutation.inordel == "in")
     {
         resolved_position = resolve_insertion_position(
@@ -1330,14 +1332,144 @@ void apply_balanced_inversion(
     verify_strand_lengths(chromosome);
 }
 
+struct DelInsRecord {
+    std::size_t chromosome_index = 0;
+    Mutation_Metadata* mutation = nullptr;
+};
+
+void prepare_deletion_insertions(
+    std::vector<Chromosome_Metadata>& chromosomes)
+{
+    std::map<std::uint64_t, std::vector<DelInsRecord>> events;
+
+    for (std::size_t chromosome_index = 0;
+         chromosome_index < chromosomes.size();
+         ++chromosome_index)
+    {
+        for (auto& mutation :
+             chromosomes[chromosome_index].mdata_matrix)
+        {
+            if (mutation.mutation_type != "delins") {
+                continue;
+            }
+
+            if (mutation.event_id == 0) {
+                throw std::runtime_error(
+                    "A Del-Ins record has event_id 0."
+                );
+            }
+            if (mutation.inordel != "del" &&
+                mutation.inordel != "in")
+            {
+                throw std::runtime_error(
+                    "A Del-Ins record must have subtype 'del' or 'in'."
+                );
+            }
+
+            events[mutation.event_id].push_back(
+                {chromosome_index, &mutation}
+            );
+        }
+    }
+
+    for (auto& [event_id, records] : events) {
+        if (records.size() != 2) {
+            throw std::runtime_error(
+                "Del-Ins event " + std::to_string(event_id) +
+                " does not have exactly two records."
+            );
+        }
+
+        DelInsRecord* donor = nullptr;
+        DelInsRecord* recipient = nullptr;
+
+        for (auto& record : records) {
+            if (record.mutation->inordel == "del") {
+                if (donor != nullptr) {
+                    throw std::runtime_error(
+                        "Del-Ins event " + std::to_string(event_id) +
+                        " has more than one donor record."
+                    );
+                }
+                donor = &record;
+            }
+            else {
+                if (recipient != nullptr) {
+                    throw std::runtime_error(
+                        "Del-Ins event " + std::to_string(event_id) +
+                        " has more than one recipient record."
+                    );
+                }
+                recipient = &record;
+            }
+        }
+
+        if (donor == nullptr || recipient == nullptr) {
+            throw std::runtime_error(
+                "Del-Ins event " + std::to_string(event_id) +
+                " requires one donor deletion and one recipient insertion."
+            );
+        }
+
+        auto& donor_chromosome =
+            chromosomes.at(donor->chromosome_index);
+        auto& recipient_chromosome =
+            chromosomes.at(recipient->chromosome_index);
+        auto& donor_mutation = *donor->mutation;
+        auto& recipient_mutation = *recipient->mutation;
+
+        if (donor_mutation.pair != recipient_chromosome.chromosome_number ||
+            recipient_mutation.pair != donor_chromosome.chromosome_number)
+        {
+            throw std::runtime_error(
+                "Del-Ins event " + std::to_string(event_id) +
+                " contains non-reciprocal partner metadata."
+            );
+        }
+        if (donor_mutation.length <= 0 ||
+            donor_mutation.length != recipient_mutation.length)
+        {
+            throw std::runtime_error(
+                "Del-Ins event " + std::to_string(event_id) +
+                " has invalid or unequal donor and recipient lengths."
+            );
+        }
+
+        const std::size_t donor_position =
+            static_cast<std::size_t>(donor_mutation.position);
+        const std::size_t length =
+            static_cast<std::size_t>(donor_mutation.length);
+
+        if (donor_position > donor_chromosome.chromA_seq.size() ||
+            length > donor_chromosome.chromA_seq.size() - donor_position)
+        {
+            throw std::out_of_range(
+                "Del-Ins donor interval is outside the chromosome."
+            );
+        }
+
+        // Capture the donor segment before any chromosome is edited. This keeps
+        // same-chromosome and cross-chromosome Del-Ins events in the original
+        // reference-coordinate system.
+        recipient_mutation.base_pairs =
+            donor_chromosome.chromA_seq.substr(donor_position, length);
+    }
+}
+
 void apply_local_mutations(
     std::vector<Chromosome_Metadata>& chromosomes,
     bool allow_resampling)
 {
+    // Resolve every local coordinate before editing any chromosome. Del-Ins
+    // needs both paired records to refer to the original loaded genome.
     for (auto& chromosome : chromosomes) {
         verify_strand_lengths(chromosome);
         resolve_local_mutation_positions(chromosome, allow_resampling);
+    }
 
+    prepare_deletion_insertions(chromosomes);
+
+    for (auto& chromosome : chromosomes) {
         std::vector<Mutation_Metadata*> local_mutations;
         for (auto& mutation : chromosome.mdata_matrix) {
             if (is_local_mutation(mutation)) {
@@ -1364,19 +1496,21 @@ void apply_local_mutations(
             else if (mutation->mutation_type == "balinv") {
                 apply_balanced_inversion(chromosome, *mutation);
             }
-            else if (mutation->mutation_type == "indel" &&
+            else if ((mutation->mutation_type == "indel" ||
+                      mutation->mutation_type == "delins") &&
                      mutation->inordel == "del")
             {
                 apply_deletion(chromosome, *mutation);
             }
-            else if (mutation->mutation_type == "indel" &&
+            else if ((mutation->mutation_type == "indel" ||
+                      mutation->mutation_type == "delins") &&
                      mutation->inordel == "in")
             {
                 apply_insertion(chromosome, *mutation);
             }
             else {
                 throw std::invalid_argument(
-                    "Unknown local mutation type or indel subtype."
+                    "Unknown local mutation type or insertion/deletion subtype."
                 );
             }
         }
@@ -1597,6 +1731,9 @@ std::string mutation_display_name(const Mutation_Metadata& mutation) {
     if (mutation.mutation_type == "baltrans") {
         return "balanced_translocation";
     }
+    if (mutation.mutation_type == "delins") {
+        return "deletion_insertion";
+    }
     if (mutation.mutation_type == "indel" && mutation.inordel == "in") {
         return "short_insertion";
     }
@@ -1610,7 +1747,10 @@ std::string mutation_display_name(const Mutation_Metadata& mutation) {
 std::string location_1based(const Mutation_Metadata& mutation) {
     const long long position = mutation.position;
 
-    if (mutation.mutation_type == "indel" && mutation.inordel == "in") {
+    if ((mutation.mutation_type == "indel" ||
+         mutation.mutation_type == "delins") &&
+        mutation.inordel == "in")
+    {
         if (position == 0) {
             return "before base 1";
         }
@@ -1636,24 +1776,26 @@ struct PartnerTruthRecord {
     int position = -1;
 };
 
-PartnerTruthRecord find_translocation_partner_for_report(
+PartnerTruthRecord find_paired_event_partner_for_report(
     const Cell_Metadata& cell,
-    const Mutation_Metadata& mutation,
-    int current_chromosome)
+    const Mutation_Metadata& mutation)
 {
     PartnerTruthRecord result;
 
-    if (mutation.mutation_type != "baltrans" || mutation.event_id == 0) {
+    const bool is_paired_event =
+        mutation.mutation_type == "baltrans" ||
+        mutation.mutation_type == "delins";
+
+    if (!is_paired_event || mutation.event_id == 0) {
         return result;
     }
 
     for (const auto& chromosome : cell.cdata_matrix) {
-        if (chromosome.chromosome_number == current_chromosome) {
-            continue;
-        }
-
         for (const auto& candidate : chromosome.mdata_matrix) {
-            if (candidate.mutation_type == "baltrans" &&
+            if (&candidate == &mutation) {
+                continue;
+            }
+            if (candidate.mutation_type == mutation.mutation_type &&
                 candidate.event_id == mutation.event_id)
             {
                 result.chromosome_number = chromosome.chromosome_number;
@@ -1686,6 +1828,8 @@ void append_mutation_truth_report(
               "forward-reference contig.\n"
            << "# Translocation coordinates are cut sites after local "
               "mutations have been applied.\n"
+           << "# Del-Ins donor and recipient coordinates are relative to the "
+              "original forward-reference contigs.\n"
            << "# start_0based/end_0based_exclusive use half-open intervals. "
               "Insertions have start=end.\n";
 
@@ -1704,7 +1848,8 @@ void append_mutation_truth_report(
 
         for (const auto& mutation : chromosome.mdata_matrix) {
             const bool is_insertion =
-                mutation.mutation_type == "indel" &&
+                (mutation.mutation_type == "indel" ||
+                 mutation.mutation_type == "delins") &&
                 mutation.inordel == "in";
 
             const long long start_0based = mutation.position;
@@ -1713,10 +1858,9 @@ void append_mutation_truth_report(
                 : start_0based + mutation.length;
 
             const PartnerTruthRecord partner =
-                find_translocation_partner_for_report(
+                find_paired_event_partner_for_report(
                     cell,
-                    mutation,
-                    chromosome.chromosome_number
+                    mutation
                 );
 
             const std::string event_id = mutation.event_id == 0
@@ -1765,7 +1909,9 @@ void append_mutation_truth_report(
                 << " | " << location_1based(mutation)
                 << " | length=" << mutation.length << " bp";
 
-            if (mutation.mutation_type == "baltrans") {
+            if (mutation.mutation_type == "baltrans" ||
+                mutation.mutation_type == "delins")
+            {
                 std::cout
                     << " | partner=" << partner_contig
                     << " at 0-based breakpoint " << partner_position;
@@ -1952,8 +2098,8 @@ std::vector<double> buildMutatedCellGenome_from_MM(
         !loaded_existing_metadata
     );
 
-    // Translocations are applied only after all chromosome sequences are loaded
-    // and after local mutation coordinates have been resolved.
+    // Balanced translocations are applied after local mutations, including
+    // Del-Ins donor deletions and recipient insertions.
     apply_balanced_translocations(cell.cdata_matrix);
 
     // At this point every mutation has a final absolute position, and

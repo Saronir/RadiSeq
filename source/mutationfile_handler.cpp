@@ -53,15 +53,23 @@ bool check_mutation_file(const std::string& filename) {
 
 std::vector<Chromosome_Metadata> mutation_generator(NGSParameters& parameters) {
     const int num_chrom = parameters.get_number_chromo();
-    const double mutation_frequency =
+    const double structural_variation_frequency =
         parameters.get_structural_variation_frequency();
+    const double indel_frequency = parameters.get_indel_frequency();
 
     if (num_chrom <= 0) {
         throw std::invalid_argument("number_chromo must be positive.");
     }
-    if (!std::isfinite(mutation_frequency) || mutation_frequency < 0.0) {
+    if (!std::isfinite(structural_variation_frequency) ||
+        structural_variation_frequency < 0.0)
+    {
         throw std::invalid_argument(
             "structural_variation_frequency must be finite and non-negative."
+        );
+    }
+    if (!std::isfinite(indel_frequency) || indel_frequency < 0.0) {
+        throw std::invalid_argument(
+            "indel_frequency must be finite and non-negative."
         );
     }
 
@@ -71,7 +79,7 @@ std::vector<Chromosome_Metadata> mutation_generator(NGSParameters& parameters) {
         parameters.get_proportion_balanced_inversions();
     const double proportion_balanced_translocations =
         parameters.get_proportion_balanced_translocations();
-    const double proportion_indels = parameters.get_proportion_indels();
+    const double proportion_delins = parameters.get_proportion_delins();
 
     validate_proportion(proportion_long_deletions,
                         "proportion_long_deletions");
@@ -79,17 +87,17 @@ std::vector<Chromosome_Metadata> mutation_generator(NGSParameters& parameters) {
                         "proportion_balanced_inversions");
     validate_proportion(proportion_balanced_translocations,
                         "proportion_balanced_translocations");
-    validate_proportion(proportion_indels, "proportion_indels");
+    validate_proportion(proportion_delins, "proportion_delins");
 
-    const double proportion_sum =
+    const double structural_variation_proportion_sum =
         proportion_long_deletions +
         proportion_balanced_inversions +
         proportion_balanced_translocations +
-        proportion_indels;
+        proportion_delins;
 
-    if (proportion_sum > 1.0 + 1.0e-12) {
+    if (structural_variation_proportion_sum > 1.0 + 1.0e-12) {
         throw std::invalid_argument(
-            "The mutation-type proportions must sum to no more than 1."
+            "The four structural-variant proportions must sum to no more than 1."
         );
     }
 
@@ -99,21 +107,24 @@ std::vector<Chromosome_Metadata> mutation_generator(NGSParameters& parameters) {
     const int length_BI_max = parameters.get_max_balanced_inversion_length();
     const int length_BT_min = parameters.get_min_balanced_translocation_length();
     const int length_BT_max = parameters.get_max_balanced_translocation_length();
+    const int length_DI_min = parameters.get_min_delins_length();
+    const int length_DI_max = parameters.get_max_delins_length();
     const int length_ID_min = parameters.get_min_indel_length();
     const int length_ID_max = parameters.get_max_indel_length();
 
     const int num_long_del = rng::poisson_sample(
-        proportion_long_deletions * mutation_frequency
+        proportion_long_deletions * structural_variation_frequency
     );
     const int num_bal_inv = rng::poisson_sample(
-        proportion_balanced_inversions * mutation_frequency
+        proportion_balanced_inversions * structural_variation_frequency
     );
     const int num_bal_trans = rng::poisson_sample(
-        proportion_balanced_translocations * mutation_frequency
+        proportion_balanced_translocations * structural_variation_frequency
     );
-    const int num_indel = rng::poisson_sample(
-        proportion_indels * mutation_frequency
+    const int num_delins = rng::poisson_sample(
+        proportion_delins * structural_variation_frequency
     );
+    const int num_indel = rng::poisson_sample(indel_frequency);
 
     if (num_long_del > 0) {
         validate_length_range(
@@ -128,6 +139,11 @@ std::vector<Chromosome_Metadata> mutation_generator(NGSParameters& parameters) {
     if (num_bal_trans > 0) {
         validate_length_range(
             length_BT_min, length_BT_max, "translocation length"
+        );
+    }
+    if (num_delins > 0) {
+        validate_length_range(
+            length_DI_min, length_DI_max, "Del-Ins length"
         );
     }
     if (num_indel > 0) {
@@ -202,6 +218,40 @@ std::vector<Chromosome_Metadata> mutation_generator(NGSParameters& parameters) {
 
         add_mutation(chromosomes, chromosome_a, std::move(mutation_a));
         add_mutation(chromosomes, chromosome_b, std::move(mutation_b));
+    }
+
+    for (int i = 0; i < num_delins; ++i) {
+        const int donor_chromosome = rng::int_sample(1, num_chrom);
+        const int recipient_chromosome = rng::int_sample(1, num_chrom);
+        const int length = rng::int_sample(length_DI_min, length_DI_max);
+        const std::uint64_t event_id = next_event_id++;
+
+        Mutation_Metadata donor;
+        donor.mutation_type = "delins";
+        donor.normalized_position = rng::double_sample_0to1();
+        donor.length = length;
+        donor.pair = recipient_chromosome;
+        donor.event_id = event_id;
+        donor.inordel = "del";
+
+        Mutation_Metadata recipient;
+        recipient.mutation_type = "delins";
+        recipient.normalized_position = rng::double_sample_0to1();
+        recipient.length = length;
+        recipient.pair = donor_chromosome;
+        recipient.event_id = event_id;
+        recipient.inordel = "in";
+
+        add_mutation(
+            chromosomes,
+            donor_chromosome,
+            std::move(donor)
+        );
+        add_mutation(
+            chromosomes,
+            recipient_chromosome,
+            std::move(recipient)
+        );
     }
 
     for (int i = 0; i < num_indel; ++i) {

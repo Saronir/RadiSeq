@@ -1,0 +1,34 @@
+# RadiSeq MutaGen mutation parameters with Del-Ins support
+#
+# Use this block in the parameter file passed to RadiSeq. The program first
+# reads NGSDefaultParameters.txt, then applies values from the user parameter
+# file, so this file can be merged with your other run-specific settings.
+
+# Independent Poisson means per mutated cell:
+structural_variation_frequency              = 10.0
+indel_frequency                             = 1.0
+
+# The four values below divide structural_variation_frequency.
+# This example sums to 1.000.
+proportion_balanced_inversions              = 0.475
+proportion_balanced_translocations          = 0.254
+proportion_long_deletions                   = 0.169
+proportion_delins                           = 0.102
+
+min_balanced_inversion_length               = 50
+max_balanced_inversion_length               = 10000
+
+min_balanced_translocation_length           = 5000
+max_balanced_translocation_length           = 100000
+
+min_long_deletion_length                    = 1000
+max_long_deletion_length                    = 10000
+
+# Del-Ins is a moved donor segment: delete at the donor locus and insert the
+# same bases at a separately sampled recipient locus.
+min_delins_length                           = 100
+max_delins_length                           = 1000
+
+# Short indels are now independent of structural_variation_frequency.
+min_indel_length                            = 1
+max_indel_length                            = 99

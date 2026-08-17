@@ -11,12 +11,12 @@
 using json = nlohmann::json;
 
 struct Mutation_Metadata {
-    std::string mutation_type = "none";  // none, longdel, balinv, baltrans, indel
+    std::string mutation_type = "none";  // none, longdel, balinv, baltrans, delins, indel
     double normalized_position = 0.0;
     int position = 0;                    // 0-based coordinate on chromosome
     int length = 0;                      // mutation length in base pairs
-    int pair = 0;                        // 1-based partner chromosome for translocations
-    std::uint64_t event_id = 0;          // shared by both records of one translocation
+    int pair = 0;                        // 1-based partner chromosome for paired SV records
+    std::uint64_t event_id = 0;          // shared by records belonging to one SV event
     std::string inordel = "none";        // none, in, del
     std::string base_pairs;
 };

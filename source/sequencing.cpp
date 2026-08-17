@@ -4,6 +4,7 @@
 #include "random_generator.h"
 #include "summary_report.h"
 #include "support_functions.h"
+#include "paired_end_pipeline.h"
 
 #include <iostream>
 #include <string>
@@ -139,113 +140,144 @@ void single_cell_sequencing(NGSParameters& parameter, const std::vector<std::str
             }
         }
         // Paired-end sequencing
-        else{                                                                                           // If user asked to perform paired-end sequencing
-            std::string output_fastq_R2_filename = (*parameter.get_output_directory())+"/"+(*parameter.get_output_fastq_filename_prefix())+"_"+std::to_string(i)+"_R2.fastq.gz";
-            std::ofstream fastq_R2_file(output_fastq_R2_filename.c_str(),std::ios::binary);             // ofstream object of the output fastq file for read 2
+        // else{                                                                                           // If user asked to perform paired-end sequencing
+        //     std::string output_fastq_R2_filename = (*parameter.get_output_directory())+"/"+(*parameter.get_output_fastq_filename_prefix())+"_"+std::to_string(i)+"_R2.fastq.gz";
+        //     std::ofstream fastq_R2_file(output_fastq_R2_filename.c_str(),std::ios::binary);             // ofstream object of the output fastq file for read 2
             
-            ART read2;                                                                                  // Creating an ART class object and setting the insertion and deletion probability vectors for that read object
-            read2.set_read_error_rates(parameter.get_insertion_error_rate_read2(),parameter.get_deletion_error_rate_read2());
-            //read2.set_read_error_probability(parameter.get_read_length(), parameter.get_insertion_error_rate_read2(), read2.insertion_probability_vec, parameter.get_max_errors_in_read());
-            //read2.set_read_error_probability(parameter.get_read_length(), parameter.get_deletion_error_rate_read2(), read2.deletion_probability_vec, parameter.get_max_errors_in_read());
+        //     ART read2;                                                                                  // Creating an ART class object and setting the insertion and deletion probability vectors for that read object
+        //     read2.set_read_error_rates(parameter.get_insertion_error_rate_read2(),parameter.get_deletion_error_rate_read2());
+        //     //read2.set_read_error_probability(parameter.get_read_length(), parameter.get_insertion_error_rate_read2(), read2.insertion_probability_vec, parameter.get_max_errors_in_read());
+        //     //read2.set_read_error_probability(parameter.get_read_length(), parameter.get_deletion_error_rate_read2(), read2.deletion_probability_vec, parameter.get_max_errors_in_read());
 
-            int good_iterations{0};                                                                     // Temporary counter variable to count the number of iterations where a read was generated. Read will not be generated if some condition is not met
+        //     int good_iterations{0};                                                                     // Temporary counter variable to count the number of iterations where a read was generated. Read will not be generated if some condition is not met
     
-            std::vector<std::vector<std::string>> batch_buffer_r1(nThreads_User);                       // Create a buffer for each thread for storing read 1 data.
-            std::vector<std::vector<std::string>> batch_buffer_r2(nThreads_User);                       // Create a buffer for each thread for storing read 2 data.
+        //     std::vector<std::vector<std::string>> batch_buffer_r1(nThreads_User);                       // Create a buffer for each thread for storing read 1 data.
+        //     std::vector<std::vector<std::string>> batch_buffer_r2(nThreads_User);                       // Create a buffer for each thread for storing read 2 data.
             
-            #pragma omp parallel shared(chromSegSeq,chromSegSeq_ID,end_flag,goodSegment,good_iterations)// Start the parallel region. Threads will be generated and they will get the specific shared variables
-            {
-                int local_end_flag = 1;                                                                 // A flag for each thread to check if the end of memory map is reached. 
-                while(local_end_flag){
-                    #pragma omp master                                                                  // Only the master thread should execute this block; other threads will skip this section
-                    {   
-                        end_flag = getNextChromSeq_MM(cell_fastaFileData, fastaFileSize, position, chromSegSeq, chromSegSeq_ID); // 0 if end of the memory map is reached
-                    }
-                    #pragma omp barrier                                                                 // Threads should wait here till all the threads reach this point
-                    #pragma omp flush(end_flag)                                                         // Make sure the end_flag variable gets the latest updated value and not get cached
-                    local_end_flag = end_flag;                                                          // Update the local flag so that all the threads get the updated value
-                    long num_reads_per_segment = static_cast<long>((coverage_per_cell*chromSegSeq.size())/parameter.get_read_length());
+        //     #pragma omp parallel shared(chromSegSeq,chromSegSeq_ID,end_flag,goodSegment,good_iterations)// Start the parallel region. Threads will be generated and they will get the specific shared variables
+        //     {
+        //         int local_end_flag = 1;                                                                 // A flag for each thread to check if the end of memory map is reached. 
+        //         while(local_end_flag){
+        //             #pragma omp master                                                                  // Only the master thread should execute this block; other threads will skip this section
+        //             {   
+        //                 end_flag = getNextChromSeq_MM(cell_fastaFileData, fastaFileSize, position, chromSegSeq, chromSegSeq_ID); // 0 if end of the memory map is reached
+        //             }
+        //             #pragma omp barrier                                                                 // Threads should wait here till all the threads reach this point
+        //             #pragma omp flush(end_flag)                                                         // Make sure the end_flag variable gets the latest updated value and not get cached
+        //             local_end_flag = end_flag;                                                          // Update the local flag so that all the threads get the updated value
+        //             long num_reads_per_segment = static_cast<long>((coverage_per_cell*chromSegSeq.size())/parameter.get_read_length());
                     
-                    if(num_reads_per_segment>=1 && (static_cast<int>(chromSegSeq.size())>parameter.get_read_length())){   // Proceed only if at least one read is needed from chromSegmentSeq and segment is bigger than the read length, otherwise continue with the next segment
-                        #pragma omp master                                                              // This section needs to be done by only one thread
-                        {   
-                            int nThreads_omp = omp_get_num_threads();                                   // Get the actual number of threads available for OpenMP
-                            goodSegment = true;                                                         // Reset flag for each segment
-                            goodSegment = goodSegment && read1.int_set(chromSegSeq, nThreads_omp);
-                            goodSegment = goodSegment && read2.int_set(chromSegSeq, nThreads_omp);
-                            //goodSegment = goodSegment && ART::get_N_mask_and_GCbias(parameter.get_N_threshold_in_reads(), parameter.get_min_DNA_fragment_length()); // Mask regions in the chromSegSeq where the number of N's exceed the threshold to avoid making reads
-                            goodSegment = goodSegment && ART::GCbias_maker(min_DNA_fragment_length);
-                            if(*parameter.get_coverage_distribution() == "mda" && goodSegment){         // Divided the number of reads per segment by 2 coz each site generate two reads in paired-end seq
-                                goodSegment = goodSegment && ART::MDA_distribution_maker(num_reads_per_segment/2, coverage_per_cell);
-                            }
-                            good_iterations = 0;                                                        // Reset the counter for each chrom segment
-                        }
-                        #pragma omp barrier                                                             // Make sure all threads reach this point, before proceeding with the rest
-                        #pragma omp flush(goodSegment)                                                  // Make sure the goodSegment variable gets the latest updated value and not get cached
-                        bool local_goodSegment = goodSegment;                                           // Update the local flag so that all the threads get the updated value
+        //             if(num_reads_per_segment>=1 && (static_cast<int>(chromSegSeq.size())>parameter.get_read_length())){   // Proceed only if at least one read is needed from chromSegmentSeq and segment is bigger than the read length, otherwise continue with the next segment
+        //                 #pragma omp master                                                              // This section needs to be done by only one thread
+        //                 {   
+        //                     int nThreads_omp = omp_get_num_threads();                                   // Get the actual number of threads available for OpenMP
+        //                     goodSegment = true;                                                         // Reset flag for each segment
+        //                     goodSegment = goodSegment && read1.int_set(chromSegSeq, nThreads_omp);
+        //                     goodSegment = goodSegment && read2.int_set(chromSegSeq, nThreads_omp);
+        //                     //goodSegment = goodSegment && ART::get_N_mask_and_GCbias(parameter.get_N_threshold_in_reads(), parameter.get_min_DNA_fragment_length()); // Mask regions in the chromSegSeq where the number of N's exceed the threshold to avoid making reads
+        //                     goodSegment = goodSegment && ART::GCbias_maker(min_DNA_fragment_length);
+        //                     if(*parameter.get_coverage_distribution() == "mda" && goodSegment){         // Divided the number of reads per segment by 2 coz each site generate two reads in paired-end seq
+        //                         goodSegment = goodSegment && ART::MDA_distribution_maker(num_reads_per_segment/2, coverage_per_cell);
+        //                     }
+        //                     good_iterations = 0;                                                        // Reset the counter for each chrom segment
+        //                 }
+        //                 #pragma omp barrier                                                             // Make sure all threads reach this point, before proceeding with the rest
+        //                 #pragma omp flush(goodSegment)                                                  // Make sure the goodSegment variable gets the latest updated value and not get cached
+        //                 bool local_goodSegment = goodSegment;                                           // Update the local flag so that all the threads get the updated value
                         
-                        if(local_goodSegment){                                                          // Proceed only if the chromoSegSeq is good
-                            while(good_iterations<num_reads_per_segment){
-                                int target_reads = num_reads_per_segment - good_iterations;             // Remaining reads to be generated in each while loop
-                                int local_good_iterations{0};                                           // Thread-local counter for iterations that generated reads
-                                #pragma omp for schedule(dynamic) 
-                                for(int j=0; j<target_reads; j+=2){                                     // Create as many reads per segment in a loop. J is incremented by 2 since two reads are created in one loop (paired end)
-                                    int threadID = omp_get_thread_num();                                               // Get the ID of each thread being tracked
-                                    if(ART::generate_paired_reads_with_indel(read1, read2, min_DNA_fragment_length, fragment_weights, threadID)){
-                                                                                                                       // Make two paired-reads from the same DNA fragment with indel errors
-                                        // Process read 1 first
-                                        std::vector<short> read1_quality_score_vec;                                    // Vector to hold the quality scores for read 1
-                                        read1.get_read_quality(read1_quality_score_vec, 1,threadID);                   // Get the read quality scores for the read positions for read 1
-                                        read1.add_baseCall_error(read1_quality_score_vec,threadID);                    // Add base call errors to the read based on the quality scores on read 2
+        //                 if(local_goodSegment){                                                          // Proceed only if the chromoSegSeq is good
+        //                     while(good_iterations<num_reads_per_segment){
+        //                         int target_reads = num_reads_per_segment - good_iterations;             // Remaining reads to be generated in each while loop
+        //                         int local_good_iterations{0};                                           // Thread-local counter for iterations that generated reads
+        //                         #pragma omp for schedule(dynamic) 
+        //                         for(int j=0; j<target_reads; j+=2){                                     // Create as many reads per segment in a loop. J is incremented by 2 since two reads are created in one loop (paired end)
+        //                             int threadID = omp_get_thread_num();                                               // Get the ID of each thread being tracked
+        //                             if(ART::generate_paired_reads_with_indel(read1, read2, min_DNA_fragment_length, fragment_weights, threadID)){
+        //                                                                                                                // Make two paired-reads from the same DNA fragment with indel errors
+        //                                 // Process read 1 first
+        //                                 std::vector<short> read1_quality_score_vec;                                    // Vector to hold the quality scores for read 1
+        //                                 read1.get_read_quality(read1_quality_score_vec, 1,threadID);                   // Get the read quality scores for the read positions for read 1
+        //                                 read1.add_baseCall_error(read1_quality_score_vec,threadID);                    // Add base call errors to the read based on the quality scores on read 2
                                         
-                                        std::string chromID = chromSegSeq_ID; chromID.erase(0,1);                      // Remove the '>' symbol from the chrom ID
-                                        std::string read1_data = "@"+chromID+"_read"+std::to_string(j)+"/1\n";         // @readID
-                                        read1_data += (*read1.get_final_read_sequence(threadID)) + "\n+\n";            // read sequence and +
-                                        for(size_t k=0; k<(*read1.get_final_read_sequence(threadID)).size(); k++){     // read quality scores
-                                            read1_data += static_cast<char>(read1_quality_score_vec[k]+32);            // +33 to get the phred score
-                                        }
-                                        read1_data += "\n";
+        //                                 std::string chromID = chromSegSeq_ID; chromID.erase(0,1);                      // Remove the '>' symbol from the chrom ID
+        //                                 std::string read1_data = "@"+chromID+"_read"+std::to_string(j)+"/1\n";         // @readID
+        //                                 read1_data += (*read1.get_final_read_sequence(threadID)) + "\n+\n";            // read sequence and +
+        //                                 for(size_t k=0; k<(*read1.get_final_read_sequence(threadID)).size(); k++){     // read quality scores
+        //                                     read1_data += static_cast<char>(read1_quality_score_vec[k]+32);            // +33 to get the phred score
+        //                                 }
+        //                                 read1_data += "\n";
 
-                                        // Process read 2
-                                        std::vector<short> read2_quality_score_vec;                                    // Vector to hold the quality scores for read 2
-                                        read2.get_read_quality(read2_quality_score_vec, 2,threadID);                   // Get the read quality scores for the read positions for read 2
-                                        read2.add_baseCall_error(read2_quality_score_vec,threadID);                    // Add base call errors to the read based on the quality scores on read 2
+        //                                 // Process read 2
+        //                                 std::vector<short> read2_quality_score_vec;                                    // Vector to hold the quality scores for read 2
+        //                                 read2.get_read_quality(read2_quality_score_vec, 2,threadID);                   // Get the read quality scores for the read positions for read 2
+        //                                 read2.add_baseCall_error(read2_quality_score_vec,threadID);                    // Add base call errors to the read based on the quality scores on read 2
                                         
-                                        std::string read2_data = "@"+chromID+"_read"+std::to_string(j)+"/2\n";         // @readID
-                                        read2_data += (*read2.get_final_read_sequence(threadID)) + "\n+\n";            // read sequence and +
-                                        for(size_t k=0; k<(*read2.get_final_read_sequence(threadID)).size(); k++){     // read quality scores
-                                            read2_data += static_cast<char>(read2_quality_score_vec[k]+32);            // +33 to get the phred score
-                                        }
-                                        read2_data += "\n";
+        //                                 std::string read2_data = "@"+chromID+"_read"+std::to_string(j)+"/2\n";         // @readID
+        //                                 read2_data += (*read2.get_final_read_sequence(threadID)) + "\n+\n";            // read sequence and +
+        //                                 for(size_t k=0; k<(*read2.get_final_read_sequence(threadID)).size(); k++){     // read quality scores
+        //                                     read2_data += static_cast<char>(read2_quality_score_vec[k]+32);            // +33 to get the phred score
+        //                                 }
+        //                                 read2_data += "\n";
                                         
-                                        local_good_iterations+=2;                                                      // Increment the thread-local counter
+        //                                 local_good_iterations+=2;                                                      // Increment the thread-local counter
 
-                                        batch_buffer_r1[threadID].push_back(read1_data);                               // Add the read 1 data to the thread's buffer 1.   
-                                        batch_buffer_r2[threadID].push_back(read2_data);                               // Add the read 2 data to the thread's buffer 2.                 
-                                        if (batch_buffer_r1[threadID].size() >= static_cast<size_t>(batchSize_thread)){// Check if the batch buffer is full, and write it to the file if needed.
-                                            #pragma omp critical(section1)
-                                            {
-                                                writeBatchToFile(batch_buffer_r1[threadID], fastq_R1_file, true);
-                                                writeBatchToFile(batch_buffer_r2[threadID], fastq_R2_file, true);
-                                            }
-                                        }
-                                    }
-                                }
-                                #pragma omp atomic                                                                     // Ensure only one thread modifies the shared variable at a time
-                                good_iterations += local_good_iterations;
-                                #pragma omp barrier   
-                            }
-                            #pragma omp barrier
-                        }
-                    }
-                    #pragma omp barrier
-                }
-            }
-            for (size_t l=0;l<batch_buffer_r1.size();l++){
-                writeBatchToFile(batch_buffer_r1[l], fastq_R1_file, true);                              // If there are unwritten data in batch buffer 1, write that too when the loop ends
-                writeBatchToFile(batch_buffer_r2[l], fastq_R2_file, true);                              // If there are unwritten data in batch buffer 1, write that too when the loop ends
-            }
-            fastq_R2_file.close();
+        //                                 batch_buffer_r1[threadID].push_back(read1_data);                               // Add the read 1 data to the thread's buffer 1.   
+        //                                 batch_buffer_r2[threadID].push_back(read2_data);                               // Add the read 2 data to the thread's buffer 2.                 
+        //                                 if (batch_buffer_r1[threadID].size() >= static_cast<size_t>(batchSize_thread)){// Check if the batch buffer is full, and write it to the file if needed.
+        //                                     #pragma omp critical(section1)
+        //                                     {
+        //                                         writeBatchToFile(batch_buffer_r1[threadID], fastq_R1_file, true);
+        //                                         writeBatchToFile(batch_buffer_r2[threadID], fastq_R2_file, true);
+        //                                     }
+        //                                 }
+        //                             }
+        //                         }
+        //                         #pragma omp atomic                                                                     // Ensure only one thread modifies the shared variable at a time
+        //                         good_iterations += local_good_iterations;
+        //                         #pragma omp barrier   
+        //                     }
+        //                     #pragma omp barrier
+        //                 }
+        //             }
+        //             #pragma omp barrier
+        //         }
+        //     }
+        //     for (size_t l=0;l<batch_buffer_r1.size();l++){
+        //         writeBatchToFile(batch_buffer_r1[l], fastq_R1_file, true);                              // If there are unwritten data in batch buffer 1, write that too when the loop ends
+        //         writeBatchToFile(batch_buffer_r2[l], fastq_R2_file, true);                              // If there are unwritten data in batch buffer 1, write that too when the loop ends
+        //     }
+        //     fastq_R2_file.close();
+        // }
+        else {
+            fastq_R1_file.close();
+
+            const std::string output_fastq_R2_filename =
+                (*parameter.get_output_directory()) + "/" +
+                (*parameter.get_output_fastq_filename_prefix()) + "_" +
+                std::to_string(i) + "_R2.fastq.gz";
+
+            radiseq::PairedPipelineConfig pipeline_config;
+            pipeline_config.pairs_per_job = 4096;
+            pipeline_config.gzip_compression_level = 3;
+            pipeline_config.quality_ascii_offset = 32;
+
+            const radiseq::PairedPipelineStats stats =
+                radiseq::run_single_cell_paired_pipeline(
+                    parameter,
+                    cell_fastaFileData,
+                    fastaFileSize,
+                    coverage_per_cell,
+                    min_DNA_fragment_length,
+                    fragment_weights,
+                    output_fastq_R1_filename,
+                    output_fastq_R2_filename,
+                    pipeline_config);
+
+            std::cout
+                << " Generated " << stats.pairs_generated
+                << " read pairs in " << stats.output_blocks_written
+                << " compressed blocks from "
+                << stats.segments_accepted << " accepted segments\n";
         }
         fastq_R1_file.close();
 

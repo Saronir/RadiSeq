@@ -182,6 +182,9 @@ void NGSParameters::set_parameters(std::string* paramName, std::string* paramVal
     else if (*paramName == "structural_variation_frequency"){
         set_structural_variation_frequency(paramName, paramValue);
     }
+    else if (*paramName == "indel_frequency"){
+        set_indel_frequency(paramName, paramValue);
+    }
     else if (*paramName == "proportion_long_deletions"){
         set_proportion_long_deletions(paramValue);
     }
@@ -191,11 +194,13 @@ void NGSParameters::set_parameters(std::string* paramName, std::string* paramVal
     else if (*paramName == "proportion_balanced_translocations"){
         set_proportion_balanced_translocations(paramValue);
     }
-    else if (*paramName == "proportion_indels"){
-        set_proportion_indels(paramValue);
+    else if (*paramName == "proportion_delins"){
+        set_proportion_delins(paramValue);
     }
-    else if (*paramName == "proportion_balanced_inversions"){
-        set_proportion_balanced_inversions(paramValue);
+    else if (*paramName == "proportion_indels"){
+        std::cerr<<"\n WARNING: \"proportion_indels\" is deprecated and ignored.\n"
+                 <<" Use \"indel_frequency\" for short indels and "
+                 <<"\"proportion_delins\" for Del-Ins structural variants.\n";
     }
     else if (*paramName == "min_long_deletion_length"){
         set_min_long_deletion_length(paramValue);
@@ -205,6 +210,9 @@ void NGSParameters::set_parameters(std::string* paramName, std::string* paramVal
     }
     else if (*paramName == "min_balanced_translocation_length"){
         set_min_balanced_translocation_length(paramValue);
+    }
+    else if (*paramName == "min_delins_length"){
+        set_min_delins_length(paramValue);
     }
     else if (*paramName == "min_indel_length"){
         set_min_indel_length(paramValue);
@@ -217,6 +225,9 @@ void NGSParameters::set_parameters(std::string* paramName, std::string* paramVal
     }
     else if (*paramName == "max_balanced_translocation_length"){
         set_max_balanced_translocation_length(paramValue);
+    }
+    else if (*paramName == "max_delins_length"){
+        set_max_delins_length(paramValue);
     }
     else if (*paramName == "max_indel_length"){
         set_max_indel_length(paramValue);
@@ -485,6 +496,14 @@ void NGSParameters::set_structural_variation_frequency(std::string* paramName, s
         std::cerr<<" ----- Setting \""<<*paramName<<"\" to its default value: \"0.0\" -----\n";
     }
 }
+void NGSParameters::set_indel_frequency(std::string* paramName, std::string* paramValue){
+    if(std::stod(*paramValue) >= 0.0){
+        indel_frequency = std::stod(*paramValue);
+    }else{
+        help_parameter(paramName);
+        std::cerr<<" ----- Setting \""<<*paramName<<"\" to its default value: \"0.0\" -----\n";
+    }
+}
 void NGSParameters::set_proportion_long_deletions(std::string* paramValue){
     proportion_long_deletions = std::stod(*paramValue);
 }
@@ -494,8 +513,8 @@ void NGSParameters::set_proportion_balanced_inversions(std::string* paramValue){
 void NGSParameters::set_proportion_balanced_translocations(std::string* paramValue){
     proportion_balanced_translocations = std::stod(*paramValue);
 }
-void NGSParameters::set_proportion_indels(std::string* paramValue){
-    proportion_indels = std::stod(*paramValue);
+void NGSParameters::set_proportion_delins(std::string* paramValue){
+    proportion_delins = std::stod(*paramValue);
 }
 void NGSParameters::set_min_long_deletion_length(std::string* paramValue){
     min_long_deletion_length = std::stoi(*paramValue);
@@ -514,6 +533,12 @@ void NGSParameters::set_min_balanced_translocation_length(std::string* paramValu
 }
 void NGSParameters::set_max_balanced_translocation_length(std::string* paramValue){
     max_balanced_translocation_length = std::stoi(*paramValue);
+}
+void NGSParameters::set_min_delins_length(std::string* paramValue){
+    min_delins_length = std::stoi(*paramValue);
+}
+void NGSParameters::set_max_delins_length(std::string* paramValue){
+    max_delins_length = std::stoi(*paramValue);
 }
 void NGSParameters::set_min_indel_length(std::string* paramValue){
     min_indel_length = std::stoi(*paramValue);
@@ -669,6 +694,9 @@ bool NGSParameters::get_summary_report(){
 double NGSParameters::get_structural_variation_frequency(){
     return(structural_variation_frequency);
 }
+double NGSParameters::get_indel_frequency(){
+    return(indel_frequency);
+}
 double NGSParameters::get_proportion_long_deletions(){
     return(proportion_long_deletions);
 }
@@ -678,8 +706,8 @@ double NGSParameters::get_proportion_balanced_inversions(){
 double NGSParameters::get_proportion_balanced_translocations(){
     return(proportion_balanced_translocations);
 }
-double NGSParameters::get_proportion_indels(){
-    return(proportion_indels);
+double NGSParameters::get_proportion_delins(){
+    return(proportion_delins);
 }
 int NGSParameters::get_min_long_deletion_length(){
     return(min_long_deletion_length);
@@ -689,6 +717,9 @@ int NGSParameters::get_min_balanced_inversion_length(){
 }
 int NGSParameters::get_min_balanced_translocation_length(){
     return(min_balanced_translocation_length);
+}
+int NGSParameters::get_min_delins_length(){
+    return(min_delins_length);
 }
 int NGSParameters::get_min_indel_length(){
     return(min_indel_length);
@@ -701,6 +732,9 @@ int NGSParameters::get_max_balanced_inversion_length(){
 }
 int NGSParameters::get_max_balanced_translocation_length(){
     return(max_balanced_translocation_length);
+}
+int NGSParameters::get_max_delins_length(){
+    return(max_delins_length);
 }
 int NGSParameters::get_max_indel_length(){
     return(max_indel_length);
@@ -839,8 +873,19 @@ void NGSParameters::help_parameter(std::string* paramName){
         <<"to specify whether or not you wish to generate a summary report at the end of the run \n";
     }
     else if (*paramName == "structural_variation_frequency"){
-         std::cerr<<" This parameter should be set to a positive double "
-        <<"or set to 0.0 to disable the feature entirely in the simulation. \n";
+         std::cerr<<" Set the mean number of structural-variant events per mutated cell. "
+        <<"Use 0.0 to disable structural variants. \n";
+    }
+    else if (*paramName == "indel_frequency"){
+         std::cerr<<" Set the mean number of short-indel events per mutated cell. "
+        <<"This is independent of structural_variation_frequency. \n";
+    }
+    else if (*paramName == "proportion_delins"){
+         std::cerr<<" Set the fraction of structural variants generated as Del-Ins. "
+        <<"All four structural-variant proportions must sum to no more than 1. \n";
+    }
+    else if (*paramName == "min_delins_length" || *paramName == "max_delins_length"){
+         std::cerr<<" Set the Del-Ins moved-segment length bounds in base pairs. \n";
     }
 }
 //--------------------------------------------------------------------------------------------
